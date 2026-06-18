@@ -10,6 +10,8 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 TELEGRAPH_COOKIE = os.environ.get("TELEGRAPH_COOKIE", "")
 
+# Sections: feeds listed in priority order.
+# keywords: if set, prefer matching articles but fall back to top articles if none match.
 SECTIONS = {
     "Foreign Policy": {
         "feeds": [
@@ -18,11 +20,11 @@ SECTIONS = {
         ],
         "keywords": [
             "foreign", "diplomacy", "diplomatic", "treaty", "summit",
-            "sanction", "conflict", "minister", "president", "war", "troops",
-            "alliance", "bilateral", "embassy", "united nations",
+            "sanction", "conflict", "troops", "alliance", "bilateral",
+            "embassy", "united nations", "war", "ceasefire", "president",
         ],
     },
-    "Russia": {
+    "Russia & Ukraine": {
         "feeds": [
             "https://www.telegraph.co.uk/news/world/rss.xml",
             "https://feeds.bbci.co.uk/news/world/europe/rss.xml",
@@ -30,7 +32,7 @@ SECTIONS = {
         ],
         "keywords": [
             "russia", "russian", "putin", "kremlin", "moscow",
-            "ukraine", "ukrainian", "kyiv", "zelensky", "wagner",
+            "ukraine", "ukrainian", "kyiv", "zelensky", "wagner", "donbas",
         ],
     },
     "NATO": {
@@ -40,8 +42,8 @@ SECTIONS = {
             "https://feeds.bbci.co.uk/news/world/europe/rss.xml",
         ],
         "keywords": [
-            "nato", "north atlantic", "article 5", "defence alliance",
-            "military alliance", "stoltenberg", "rutte", "collective defence",
+            "nato", "north atlantic", "article 5", "rutte", "stoltenberg",
+            "collective defence", "collective defense", "military alliance",
         ],
     },
     "UK Politics": {
@@ -60,9 +62,11 @@ SECTIONS = {
     },
 }
 
-JUNK_PATTERNS = re.compile(
-    r"(copy link|twitter|facebook|whatsapp|sign up|subscribe|newsletter"
-    r"|advertisement|related articles|read more|click here)",
+# Patterns to strip inline from text
+JUNK_RE = re.compile(
+    r"(copy link|share on twitter|share on facebook|share on whatsapp"
+    r"|twitter|facebook|whatsapp|sign up to|subscribe|newsletter"
+    r"|advertisement|click here)",
     re.IGNORECASE,
 )
 
@@ -75,17 +79,19 @@ def send_telegram(text):
     return response.ok
 
 
-def clean_summary(text):
+def clean_text(text):
+    """Strip junk phrases inline, then return up to 2 clean sentences."""
     if not text:
         return None
-    sentences = re.split(r"(?<=[.!?])\s+", text.replace("...", ""))
-    clean = [
-        s.strip() for s in sentences
-        if len(s.strip()) > 30 and not JUNK_PATTERNS.search(s)
-    ]
-    if not clean:
+    # Strip junk inline before splitting
+    text = JUNK_RE.sub("", text)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    # Split on sentence boundaries
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    good = [s.strip() for s in sentences if len(s.strip()) > 25]
+    if not good:
         return None
-    summary = " ".join(clean[:2])
+    summary = " ".join(good[:2])
     if not summary.endswith((".", "!", "?")):
         summary += "."
     return summary[:300]
@@ -99,57 +105,71 @@ def fetch_article_text(url, session):
         soup = BeautifulSoup(resp.text, "html.parser")
         if soup.find(class_=lambda c: c and "paywall" in c.lower()):
             return None, "cookie_expired"
-        article = soup.find("article") or soup.find(class_=lambda c: c and "article" in c.lower())
+        article = soup.find("article") or soup.find(
+            class_=lambda c: c and "article" in c.lower()
+        )
         if not article:
             return None, "parse_error"
         paragraphs = article.find_all("p", limit=6)
-        text = " ".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
+        text = " ".join(
+            p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)
+        )
         return text[:1200] if text else None, "ok"
     except Exception as e:
         return None, f"error: {e}"
 
 
-def rss_summary(entry):
+def rss_text(entry):
     raw = entry.get("summary") or entry.get("description") or ""
-    soup = BeautifulSoup(raw, "html.parser")
-    return soup.get_text(strip=True)
+    return BeautifulSoup(raw, "html.parser").get_text(strip=True)
 
 
-def matches_keywords(title, summary, keywords):
+def matches(title, body, keywords):
     if not keywords:
         return True
-    haystack = (title + " " + summary).lower()
+    haystack = (title + " " + body).lower()
     return any(kw in haystack for kw in keywords)
 
 
-def get_stories(section_config, session, n=2):
-    keywords = section_config["keywords"]
+def get_stories(config, session, n=2):
+    keywords = config["keywords"]
     seen = set()
-    candidates = []
+    keyword_hits = []
+    fallback = []
 
-    for feed_url in section_config["feeds"]:
+    for feed_url in config["feeds"]:
         feed = feedparser.parse(feed_url)
         for entry in feed.entries:
             if entry.link in seen:
                 continue
             seen.add(entry.link)
-            raw_rss = rss_summary(entry)
-            if matches_keywords(entry.title, raw_rss, keywords):
+            rss = rss_text(entry)
+            if matches(entry.title, rss, keywords):
+                keyword_hits.append(entry)
+            elif not keywords:
+                fallback.append(entry)
+            else:
+                fallback.append(entry)
+
+    # Use keyword matches first; fall back to top articles if not enough
+    candidates = keyword_hits[:n]
+    if len(candidates) < n:
+        for entry in fallback:
+            if entry not in candidates:
                 candidates.append(entry)
-        if len(candidates) >= n * 3:
-            break
+            if len(candidates) >= n:
+                break
 
     stories = []
-    for entry in candidates[:n * 3]:
-        if len(stories) >= n:
-            break
+    for entry in candidates:
         body, status = fetch_article_text(entry.link, session)
-        summary = clean_summary(body) or clean_summary(rss_summary(entry)) or "(summary unavailable)"
+        summary = clean_text(body) or clean_text(rss_text(entry)) or "(summary unavailable)"
         stories.append((entry.title, entry.link, summary, status))
 
     return stories
 
 
+# Build authenticated session
 session = requests.Session()
 session.headers.update({
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -165,8 +185,6 @@ cookie_issue = False
 for section, config in SECTIONS.items():
     stories = get_stories(config, session)
     lines.append(f"*{section}*")
-    if not stories:
-        lines.append("  No stories found today.")
     for title, link, summary, status in stories:
         lines.append(f"\u2022 *{title}*")
         lines.append(f"  {summary}")

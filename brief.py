@@ -3,6 +3,7 @@ import requests
 import os
 import sys
 import json
+import html as html_lib
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from openai import OpenAI
@@ -102,7 +103,7 @@ SECTIONS = {
     "Food & Drink": {
         "feeds": ["https://www.theguardian.com/food/rss"],
         "keywords": [],
-        "n": 2, "color": "#d97706",
+        "n": 2, "color": "#92400e",
     },
 }
 
@@ -259,18 +260,14 @@ def build_html(sections_data, top_brief, weather, today):
     if weather:
         weather_html = f"""
         <tr>
-          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:18px 32px;">
-            <table width="100%" cellpadding="0" cellspacing="0">
+          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:18px 20px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="font-size:38px;width:52px;">{weather['icon']}</td>
-                <td style="padding-left:14px;">
-                  <span style="font-size:28px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
-                  <span style="font-size:19px;color:#64748b;margin-left:10px;">{weather['desc']}</span>
-                  <span style="font-size:17px;color:#94a3b8;margin-left:10px;">H:{weather['hi']}&deg; L:{weather['lo']}&deg;</span>
-                </td>
-                <td align="right" style="font-size:17px;color:#64748b;">
-                  {weather['precip']}% rain &nbsp;&#183;&nbsp; {weather['wind']} km/h wind<br>
-                  <span style="font-size:16px;color:#94a3b8;">Solihull, UK</span>
+                <td style="font-size:36px;width:48px;vertical-align:middle;">{weather['icon']}</td>
+                <td style="padding-left:12px;vertical-align:middle;">
+                  <span style="font-size:26px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
+                  <span style="font-size:18px;color:#374151;margin-left:8px;">{weather['desc']}</span><br>
+                  <span style="font-size:15px;color:#64748b;">H:{weather['hi']}&deg; L:{weather['lo']}&deg; &nbsp;&#183;&nbsp; {weather['precip']}% rain &nbsp;&#183;&nbsp; {weather['wind']} km/h &nbsp;&#183;&nbsp; Solihull</span>
                 </td>
               </tr>
             </table>
@@ -281,11 +278,11 @@ def build_html(sections_data, top_brief, weather, today):
     if top_brief:
         brief_html = f"""
         <tr>
-          <td style="padding:26px 32px 8px;">
-            <div style="background:#0f172a;border-radius:10px;padding:24px 28px;">
-              <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#60a5fa;
+          <td style="padding:22px 20px 8px;">
+            <div style="background:#0f172a;border-radius:10px;padding:22px 20px;">
+              <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#60a5fa;
                   text-transform:uppercase;letter-spacing:0.1em;">&#128338; Your Brief</p>
-              <p style="margin:0;font-size:20px;color:#f1f5f9;line-height:1.8;">{top_brief}</p>
+              <p style="margin:0;font-size:19px;color:#f1f5f9;line-height:1.8;">{top_brief}</p>
             </div>
           </td>
         </tr>"""
@@ -295,52 +292,54 @@ def build_html(sections_data, top_brief, weather, today):
         color = SECTIONS[section]["color"]
         icon = SECTION_ICONS.get(section, "&#9679;")
 
-        # Section header block with colored background and AI summary as headline
         section_html += f"""
         <tr>
-          <td style="padding:32px 32px 0;">
-            <div style="background:{color}18;border-left:5px solid {color};border-radius:0 8px 8px 0;padding:18px 20px;">
-              <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:{color};
-                  text-transform:uppercase;letter-spacing:0.1em;">{icon}&nbsp; {section}</p>"""
+          <td style="padding:28px 20px 0;">
+            <div style="background:{color}18;border-left:5px solid {color};border-radius:0 8px 8px 0;padding:16px 16px;">
+              <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:{color};
+                  text-transform:uppercase;letter-spacing:0.08em;">{icon}&nbsp; {section}</p>"""
         if synthesis:
             section_html += f"""
-              <p style="margin:0;font-size:20px;font-weight:600;color:#1e293b;line-height:1.65;">{synthesis}</p>"""
+              <p style="margin:0;font-size:19px;font-weight:600;color:#1e293b;line-height:1.65;">{synthesis}</p>"""
         section_html += """
             </div>
           </td>
         </tr>"""
 
         for title, link, summary, thumbnail in stories:
+            title_attr = html_lib.escape(title, quote=True)
             if thumbnail:
                 article_inner = f"""
-            <table width="100%" cellpadding="0" cellspacing="0">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="padding-right:16px;vertical-align:top;">
-                  <a href="{link}" style="font-size:20px;font-weight:700;color:#1e293b;
+                <td style="padding-right:12px;vertical-align:top;">
+                  <a href="{link}" style="font-size:18px;font-weight:700;color:#1e293b;
                       text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:8px 0 0;font-size:18px;color:#475569;line-height:1.75;">{summary}</p>
-                  <a href="{link}" style="display:inline-block;margin-top:10px;font-size:16px;
-                      color:{color};font-weight:600;text-decoration:none;">Read &rarr;</a>
+                  <p style="margin:8px 0 0;font-size:17px;color:#374151;line-height:1.75;">{summary}</p>
+                  <a href="{link}" aria-label="Read: {title_attr}"
+                      style="display:inline-block;margin-top:12px;font-size:16px;padding:8px 0;
+                      color:{color};font-weight:600;text-decoration:none;min-height:44px;line-height:44px;">Read &rarr;</a>
                 </td>
-                <td width="140" valign="top" style="padding-top:3px;">
-                  <a href="{link}">
-                    <img src="{thumbnail}" width="140" height="95"
-                      style="border-radius:8px;display:block;object-fit:cover;"
-                      alt="">
+                <td class="thumb" width="120" valign="top" style="padding-top:3px;">
+                  <a href="{link}" tabindex="-1" aria-hidden="true">
+                    <img src="{thumbnail}" width="120" height="82"
+                      style="border-radius:8px;display:block;object-fit:cover;max-width:100%;"
+                      alt="{title_attr}">
                   </a>
                 </td>
               </tr>
             </table>"""
             else:
                 article_inner = f"""
-                  <a href="{link}" style="font-size:20px;font-weight:700;color:#1e293b;
+                  <a href="{link}" style="font-size:18px;font-weight:700;color:#1e293b;
                       text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:8px 0 0;font-size:18px;color:#475569;line-height:1.75;">{summary}</p>
-                  <a href="{link}" style="display:inline-block;margin-top:10px;font-size:16px;
-                      color:{color};font-weight:600;text-decoration:none;">Read &rarr;</a>"""
+                  <p style="margin:8px 0 0;font-size:17px;color:#374151;line-height:1.75;">{summary}</p>
+                  <a href="{link}" aria-label="Read: {title_attr}"
+                      style="display:inline-block;margin-top:12px;font-size:16px;padding:8px 0;
+                      color:{color};font-weight:600;text-decoration:none;min-height:44px;line-height:44px;">Read &rarr;</a>"""
             section_html += f"""
         <tr>
-          <td style="padding:18px 32px 0;">{article_inner}
+          <td style="padding:18px 20px 0;">{article_inner}
           </td>
         </tr>"""
 
@@ -349,27 +348,45 @@ def build_html(sections_data, top_brief, weather, today):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>Morning Brief</title>
+<style>
+  body {{ -webkit-text-size-adjust: 100%; }}
+  @media only screen and (max-width: 600px) {{
+    .email-outer {{ padding: 0 !important; }}
+    .email-card {{ width: 100% !important; border-radius: 0 !important; box-shadow: none !important; }}
+    .hd {{ padding: 20px 16px !important; }}
+    .hd h1 {{ font-size: 24px !important; }}
+    .pad {{ padding-left: 16px !important; padding-right: 16px !important; }}
+    .brief-p {{ font-size: 17px !important; }}
+    .synth-p {{ font-size: 17px !important; }}
+    .art-title {{ font-size: 17px !important; }}
+    .art-body {{ font-size: 16px !important; }}
+    /* Hide thumbnails on narrow screens — text-only layout is faster to scan */
+    .thumb {{ display: none !important; width: 0 !important; padding: 0 !important; overflow: hidden !important; }}
+  }}
+</style>
 </head>
-<body style="margin:0;padding:0;background:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;padding:28px 0;">
-  <tr><td align="center">
-  <table width="660" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+<body style="margin:0;padding:0;background:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;">
+  <tr><td class="email-outer" align="center" style="padding:20px 8px;">
+  <table class="email-card" role="presentation" width="620" cellpadding="0" cellspacing="0"
+      style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);max-width:100%;">
     <tr>
-      <td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:30px 32px;">
-        <p style="margin:0;font-size:14px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">&#9728; Morning Brief</p>
-        <h1 style="margin:8px 0 0;font-size:34px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
+      <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:26px 20px;">
+        <p style="margin:0;font-size:12px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">&#9728; Morning Brief</p>
+        <h1 style="margin:8px 0 0;font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
       </td>
     </tr>
     {weather_html}
     {brief_html}
-    <tr><td style="padding:0 32px;">
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:26px 0 0;">
+    <tr><td class="pad" style="padding:0 20px;">
+      <hr role="presentation" style="border:none;border-top:1px solid #e2e8f0;margin:22px 0 0;">
     </td></tr>
     {section_html}
     <tr>
-      <td style="padding:36px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;margin-top:32px;">
-        <p style="margin:0;font-size:15px;color:#94a3b8;text-align:center;">
+      <td style="padding:28px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+        <p style="margin:0;font-size:14px;color:#64748b;text-align:center;">
           Generated automatically every weekday morning &middot; Solihull, UK
         </p>
       </td>

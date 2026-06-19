@@ -10,6 +10,7 @@ from openai import OpenAI
 
 RESEND_API_KEY = os.environ["RESEND_API_KEY"]
 TO_EMAIL = os.environ.get("TO_EMAIL", "lucy.pearson@iklcomputing.co.uk")
+STAR_SIGN = "virgo"
 client = OpenAI(
     base_url="https://models.inference.ai.azure.com",
     api_key=os.environ["GITHUB_TOKEN"],
@@ -203,7 +204,7 @@ Articles:
 
 Respond with valid JSON only (no markdown fences):
 {{
-  "synthesis": "2-3 sentences summarising the key developments in this section right now — like a PA giving Lucy a quick verbal briefing on everything happening here. Direct, warm, no jargon. Use 'you' not 'one'.",
+  "synthesis": "5-7 sentences giving Lucy a thorough, substantive briefing on this section. Tell her what is happening, why it matters, what the key tensions or developments are, and what she should watch. Like a knowledgeable PA who has read everything and is walking her through it. Direct, warm, no jargon. Use 'you' not 'one'.",
   "summaries": ["One crisp sentence: the single most important fact from article 1.", "One crisp sentence: the single most important fact from article 2."]
 }}
 
@@ -213,7 +214,7 @@ Number of summaries must equal {len(stories)}."""
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=600,
+            max_tokens=800,
         )
         data = json.loads(response.choices[0].message.content)
         synthesis = data.get("synthesis", "")
@@ -255,19 +256,35 @@ Write the briefing now. Plain text only, no labels."""
     except Exception:
         return None
 
-def build_html(sections_data, top_brief, weather, today):
+def ai_horoscope(sign):
+    today_str = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
+    prompt = f"""Write a daily horoscope for {sign.capitalize()} for {today_str}.
+
+4-5 sentences. Make it feel genuinely specific to today — weave in themes relevant to {sign} like analytical thinking, attention to detail, health, work, relationships, or personal growth. Be warm, encouraging and grounded. Give it real personality. Don't start with the sign name or the date. Plain text only."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=250,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return None
+
+def build_html(sections_data, top_brief, weather, horoscope, today):
     weather_html = ""
     if weather:
         weather_html = f"""
         <tr>
-          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:18px 20px;">
+          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:20px;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="font-size:36px;width:48px;vertical-align:middle;">{weather['icon']}</td>
-                <td style="padding-left:12px;vertical-align:middle;">
-                  <span style="font-size:26px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
-                  <span style="font-size:18px;color:#374151;margin-left:8px;">{weather['desc']}</span><br>
-                  <span style="font-size:15px;color:#64748b;">H:{weather['hi']}&deg; L:{weather['lo']}&deg; &nbsp;&#183;&nbsp; {weather['precip']}% rain &nbsp;&#183;&nbsp; {weather['wind']} km/h &nbsp;&#183;&nbsp; Solihull</span>
+                <td style="font-size:44px;width:54px;vertical-align:middle;">{weather['icon']}</td>
+                <td style="padding-left:14px;vertical-align:middle;">
+                  <span style="font-size:32px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
+                  <span style="font-size:22px;color:#374151;margin-left:10px;">{weather['desc']}</span><br>
+                  <span style="font-size:18px;color:#64748b;">H:{weather['hi']}&deg; L:{weather['lo']}&deg; &nbsp;&#183;&nbsp; {weather['precip']}% rain &nbsp;&#183;&nbsp; {weather['wind']} km/h &nbsp;&#183;&nbsp; Solihull</span>
                 </td>
               </tr>
             </table>
@@ -278,11 +295,24 @@ def build_html(sections_data, top_brief, weather, today):
     if top_brief:
         brief_html = f"""
         <tr>
-          <td style="padding:22px 20px 8px;">
-            <div style="background:#0f172a;border-radius:10px;padding:22px 20px;">
-              <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:#60a5fa;
+          <td style="padding:24px 20px 12px;">
+            <div style="background:#0f172a;border-radius:10px;padding:24px 22px;">
+              <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#60a5fa;
                   text-transform:uppercase;letter-spacing:0.1em;">&#128338; Your Brief</p>
-              <p style="margin:0;font-size:19px;color:#f1f5f9;line-height:1.8;">{top_brief}</p>
+              <p style="margin:0;font-size:24px;color:#f1f5f9;line-height:1.75;">{top_brief}</p>
+            </div>
+          </td>
+        </tr>"""
+
+    horoscope_html = ""
+    if horoscope:
+        horoscope_html = f"""
+        <tr>
+          <td style="padding:0 20px 12px;">
+            <div style="background:#fdf4ff;border-left:5px solid #a855f7;border-radius:0 10px 10px 0;padding:20px 22px;">
+              <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#7c3aed;
+                  text-transform:uppercase;letter-spacing:0.08em;">&#9997;&#65039; Virgo &nbsp;&#183;&nbsp; {today}</p>
+              <p style="margin:0;font-size:22px;color:#3b0764;line-height:1.8;">{horoscope}</p>
             </div>
           </td>
         </tr>"""
@@ -295,12 +325,12 @@ def build_html(sections_data, top_brief, weather, today):
         section_html += f"""
         <tr>
           <td style="padding:28px 20px 0;">
-            <div style="background:{color}18;border-left:5px solid {color};border-radius:0 8px 8px 0;padding:16px 16px;">
-              <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:{color};
+            <div style="background:{color}18;border-left:5px solid {color};border-radius:0 8px 8px 0;padding:18px 18px;">
+              <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:{color};
                   text-transform:uppercase;letter-spacing:0.08em;">{icon}&nbsp; {section}</p>"""
         if synthesis:
             section_html += f"""
-              <p style="margin:0;font-size:19px;font-weight:600;color:#1e293b;line-height:1.65;">{synthesis}</p>"""
+              <p style="margin:0;font-size:22px;font-weight:600;color:#1e293b;line-height:1.75;">{synthesis}</p>"""
         section_html += """
             </div>
           </td>
@@ -312,17 +342,17 @@ def build_html(sections_data, top_brief, weather, today):
                 article_inner = f"""
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="padding-right:12px;vertical-align:top;">
-                  <a href="{link}" style="font-size:18px;font-weight:700;color:#1e293b;
+                <td style="padding-right:14px;vertical-align:top;">
+                  <a href="{link}" style="font-size:24px;font-weight:700;color:#1e293b;
                       text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:8px 0 0;font-size:17px;color:#374151;line-height:1.75;">{summary}</p>
+                  <p style="margin:10px 0 0;font-size:22px;color:#374151;line-height:1.75;">{summary}</p>
                   <a href="{link}" aria-label="Read: {title_attr}"
-                      style="display:inline-block;margin-top:12px;font-size:16px;padding:8px 0;
-                      color:{color};font-weight:600;text-decoration:none;min-height:44px;line-height:44px;">Read &rarr;</a>
+                      style="display:inline-block;margin-top:14px;font-size:20px;padding:10px 0;
+                      color:{color};font-weight:700;text-decoration:none;">Read &rarr;</a>
                 </td>
-                <td class="thumb" width="120" valign="top" style="padding-top:3px;">
+                <td class="thumb" width="130" valign="top" style="padding-top:4px;">
                   <a href="{link}" tabindex="-1" aria-hidden="true">
-                    <img src="{thumbnail}" width="120" height="82"
+                    <img src="{thumbnail}" width="130" height="88"
                       style="border-radius:8px;display:block;object-fit:cover;max-width:100%;"
                       alt="{title_attr}">
                   </a>
@@ -331,15 +361,15 @@ def build_html(sections_data, top_brief, weather, today):
             </table>"""
             else:
                 article_inner = f"""
-                  <a href="{link}" style="font-size:18px;font-weight:700;color:#1e293b;
+                  <a href="{link}" style="font-size:24px;font-weight:700;color:#1e293b;
                       text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:8px 0 0;font-size:17px;color:#374151;line-height:1.75;">{summary}</p>
+                  <p style="margin:10px 0 0;font-size:22px;color:#374151;line-height:1.75;">{summary}</p>
                   <a href="{link}" aria-label="Read: {title_attr}"
-                      style="display:inline-block;margin-top:12px;font-size:16px;padding:8px 0;
-                      color:{color};font-weight:600;text-decoration:none;min-height:44px;line-height:44px;">Read &rarr;</a>"""
+                      style="display:inline-block;margin-top:14px;font-size:20px;padding:10px 0;
+                      color:{color};font-weight:700;text-decoration:none;">Read &rarr;</a>"""
             section_html += f"""
         <tr>
-          <td style="padding:18px 20px 0;">{article_inner}
+          <td style="padding:20px 20px 0;">{article_inner}
           </td>
         </tr>"""
 
@@ -351,42 +381,37 @@ def build_html(sections_data, top_brief, weather, today):
 <meta name="color-scheme" content="light">
 <title>Morning Brief</title>
 <style>
-  body {{ -webkit-text-size-adjust: 100%; }}
-  @media only screen and (max-width: 600px) {{
+  body {{ -webkit-text-size-adjust: 100%; margin: 0; padding: 0; }}
+  @media only screen and (max-width: 620px) {{
     .email-outer {{ padding: 0 !important; }}
-    .email-card {{ width: 100% !important; border-radius: 0 !important; box-shadow: none !important; }}
-    .hd {{ padding: 20px 16px !important; }}
-    .hd h1 {{ font-size: 24px !important; }}
-    .pad {{ padding-left: 16px !important; padding-right: 16px !important; }}
-    .brief-p {{ font-size: 17px !important; }}
-    .synth-p {{ font-size: 17px !important; }}
-    .art-title {{ font-size: 17px !important; }}
-    .art-body {{ font-size: 16px !important; }}
-    /* Hide thumbnails on narrow screens — text-only layout is faster to scan */
+    .email-card {{ border-radius: 0 !important; box-shadow: none !important; }}
+    .hd {{ padding: 22px 18px !important; }}
+    .hd h1 {{ font-size: 26px !important; }}
     .thumb {{ display: none !important; width: 0 !important; padding: 0 !important; overflow: hidden !important; }}
   }}
 </style>
 </head>
-<body style="margin:0;padding:0;background:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;">
+<body style="background:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;">
   <tr><td class="email-outer" align="center" style="padding:20px 8px;">
-  <table class="email-card" role="presentation" width="620" cellpadding="0" cellspacing="0"
-      style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);max-width:100%;">
+  <table class="email-card" role="presentation" width="100%" cellpadding="0" cellspacing="0"
+      style="background:#ffffff;max-width:620px;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
     <tr>
-      <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:26px 20px;">
-        <p style="margin:0;font-size:12px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">&#9728; Morning Brief</p>
-        <h1 style="margin:8px 0 0;font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
+      <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:28px 20px;">
+        <p style="margin:0;font-size:14px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">&#9728; Morning Brief</p>
+        <h1 style="margin:8px 0 0;font-size:30px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
       </td>
     </tr>
     {weather_html}
     {brief_html}
-    <tr><td class="pad" style="padding:0 20px;">
+    {horoscope_html}
+    <tr><td style="padding:0 20px;">
       <hr role="presentation" style="border:none;border-top:1px solid #e2e8f0;margin:22px 0 0;">
     </td></tr>
     {section_html}
     <tr>
-      <td style="padding:28px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-        <p style="margin:0;font-size:14px;color:#64748b;text-align:center;">
+      <td style="padding:30px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+        <p style="margin:0;font-size:16px;color:#64748b;text-align:center;">
           Generated automatically every weekday morning &middot; Solihull, UK
         </p>
       </td>
@@ -415,6 +440,7 @@ def send_email(subject, html):
 
 today = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
 weather = get_weather()
+horoscope = ai_horoscope(STAR_SIGN)
 sections_data = {}
 for section, config in SECTIONS.items():
     stories = get_stories(config)
@@ -422,7 +448,7 @@ for section, config in SECTIONS.items():
     sections_data[section] = (synthesis, enhanced)
 
 top_brief = ai_top_brief(sections_data, weather)
-html = build_html(sections_data, top_brief, weather, today)
+html = build_html(sections_data, top_brief, weather, horoscope, today)
 ok, detail = send_email(f"Morning Brief — {today}", html)
 if not ok:
     print(f"Failed: {detail}", file=sys.stderr)

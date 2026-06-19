@@ -1,20 +1,28 @@
 name: Morning Brief
+
 on:
   schedule:
-    - cron: '30 6 * * *'
-  workflow_dispatch:
+    # 7:30 UTC = 7:30 GMT (winter) / 8:30 BST (summer)
+    # Adjust to 6:30 UTC in summer if you want 7:30 BST
+    - cron: '30 7 * * 1-5'
+  workflow_dispatch: # allows manual trigger from GitHub UI
+
 jobs:
   send-brief:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Install dependencies
         run: pip install feedparser requests beautifulsoup4
+
       - name: Send morning brief
         run: python brief.py
         env:
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAPH_COOKIE: ${{ secrets.TELEGRAPH_COOKIE }}

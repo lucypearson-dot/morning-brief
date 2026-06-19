@@ -25,6 +25,18 @@ WEATHER_CODES = {
     95: ("Thunderstorm", "&#9928;"),
 }
 
+SECTION_ICONS = {
+    "Foreign Policy": "&#127758;",
+    "Russia & Ukraine": "&#9876;",
+    "NATO": "&#128737;",
+    "Analyst Views": "&#128203;",
+    "UK Politics": "&#127963;",
+    "Economy": "&#128200;",
+    "Health": "&#129658;",
+    "Skincare & Wellness": "&#10024;",
+    "Food & Drink": "&#127869;",
+}
+
 SECTIONS = {
     "Foreign Policy": {
         "feeds": ["https://feeds.bbci.co.uk/news/world/rss.xml"],
@@ -123,6 +135,22 @@ def get_weather():
     except Exception:
         return None
 
+def get_thumbnail(entry):
+    try:
+        if hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
+            return entry.media_thumbnail[0].get('url', '')
+        if hasattr(entry, 'media_content') and entry.media_content:
+            for m in entry.media_content:
+                if m.get('url') and 'image' in m.get('type', ''):
+                    return m['url']
+        if hasattr(entry, 'enclosures') and entry.enclosures:
+            for enc in entry.enclosures:
+                if 'image' in enc.get('type', ''):
+                    return enc.get('href', '')
+    except Exception:
+        pass
+    return ''
+
 def get_summary(entry):
     raw = entry.get("summary") or entry.get("description") or ""
     text = BeautifulSoup(raw, "html.parser").get_text(strip=True)
@@ -146,10 +174,11 @@ def get_stories(config, default_n=3):
                 continue
             seen.add(entry.link)
             summary = get_summary(entry)
+            thumbnail = get_thumbnail(entry)
             if matches(entry.title, summary, keywords):
-                hits.append((entry.title, entry.link, summary))
+                hits.append((entry.title, entry.link, summary, thumbnail))
             else:
-                fallback.append((entry.title, entry.link, summary))
+                fallback.append((entry.title, entry.link, summary, thumbnail))
     combined = hits[:n]
     if len(combined) < n:
         for item in fallback:
@@ -164,7 +193,7 @@ def ai_enhance(section_name, stories):
         return None, stories
     articles_text = "\n\n".join(
         f"{i+1}. {title}\n{summary}"
-        for i, (title, _, summary) in enumerate(stories)
+        for i, (title, _, summary, _thumb) in enumerate(stories)
     )
     prompt = f"""You are Lucy's personal assistant giving her a morning briefing. Section: {section_name}.
 
@@ -189,8 +218,8 @@ Number of summaries must equal {len(stories)}. Be ruthlessly concise."""
         synthesis = data.get("synthesis", "")
         new_summaries = data.get("summaries", [])
         enhanced = [
-            (title, link, new_summaries[i] if i < len(new_summaries) else summary)
-            for i, (title, link, summary) in enumerate(stories)
+            (title, link, new_summaries[i] if i < len(new_summaries) else summary, thumb)
+            for i, (title, link, summary, thumb) in enumerate(stories)
         ]
         return synthesis, enhanced
     except Exception:
@@ -199,7 +228,7 @@ Number of summaries must equal {len(stories)}. Be ruthlessly concise."""
 def ai_top_brief(sections_data, weather):
     lines = []
     for section, (_, stories) in sections_data.items():
-        for title, _, summary in stories:
+        for title, _, summary, _thumb in stories:
             lines.append(f"[{section}] {title}: {summary[:100]}")
     if not lines:
         return None
@@ -230,18 +259,18 @@ def build_html(sections_data, top_brief, weather, today):
     if weather:
         weather_html = f"""
         <tr>
-          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:14px 32px;">
+          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:16px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="font-size:28px;width:44px;">{weather['icon']}</td>
+                <td style="font-size:36px;width:52px;">{weather['icon']}</td>
                 <td style="padding-left:12px;">
-                  <span style="font-size:22px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
-                  <span style="font-size:15px;color:#64748b;margin-left:8px;">{weather['desc']}</span>
-                  <span style="font-size:14px;color:#94a3b8;margin-left:10px;">H:{weather['hi']}&deg; L:{weather['lo']}&deg;</span>
+                  <span style="font-size:26px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
+                  <span style="font-size:17px;color:#64748b;margin-left:8px;">{weather['desc']}</span>
+                  <span style="font-size:16px;color:#94a3b8;margin-left:10px;">H:{weather['hi']}&deg; L:{weather['lo']}&deg;</span>
                 </td>
-                <td align="right" style="font-size:14px;color:#64748b;">
+                <td align="right" style="font-size:16px;color:#64748b;">
                   {weather['precip']}% rain &nbsp;&#183;&nbsp; {weather['wind']} km/h wind<br>
-                  <span style="font-size:13px;color:#94a3b8;">Solihull, UK</span>
+                  <span style="font-size:15px;color:#94a3b8;">Solihull, UK</span>
                 </td>
               </tr>
             </table>
@@ -253,10 +282,10 @@ def build_html(sections_data, top_brief, weather, today):
         brief_html = f"""
         <tr>
           <td style="padding:24px 32px 8px;">
-            <div style="background:#0f172a;border-radius:10px;padding:20px 24px;">
-              <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#60a5fa;
-                  text-transform:uppercase;letter-spacing:0.1em;">Your Brief</p>
-              <p style="margin:0;font-size:16px;color:#f1f5f9;line-height:1.75;">{top_brief}</p>
+            <div style="background:#0f172a;border-radius:10px;padding:22px 26px;">
+              <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#60a5fa;
+                  text-transform:uppercase;letter-spacing:0.1em;">&#128338; Your Brief</p>
+              <p style="margin:0;font-size:18px;color:#f1f5f9;line-height:1.75;">{top_brief}</p>
             </div>
           </td>
         </tr>"""
@@ -264,27 +293,57 @@ def build_html(sections_data, top_brief, weather, today):
     section_html = ""
     for section, (synthesis, stories) in sections_data.items():
         color = SECTIONS[section]["color"]
+        icon = SECTION_ICONS.get(section, "&#9679;")
         section_html += f"""
         <tr>
           <td style="padding:28px 32px 0;">
-            <h2 style="margin:0 0 4px;font-size:11px;font-weight:700;color:{color};
-                text-transform:uppercase;letter-spacing:0.1em;
-                padding-left:10px;border-left:3px solid {color};">{section}</h2>"""
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="border-left:4px solid {color};padding-left:12px;">
+                  <p style="margin:0;font-size:13px;font-weight:700;color:{color};
+                      text-transform:uppercase;letter-spacing:0.1em;">{icon}&nbsp; {section}</p>"""
         if synthesis:
             section_html += f"""
-            <p style="margin:8px 0 0;font-size:15px;color:#374151;line-height:1.7;
-                font-style:italic;padding-left:13px;">{synthesis}</p>"""
-        section_html += "</td></tr>"
+                  <p style="margin:6px 0 0;font-size:17px;color:#374151;line-height:1.7;
+                      font-style:italic;">{synthesis}</p>"""
+        section_html += """
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>"""
 
-        for title, link, summary in stories:
+        for title, link, summary, thumbnail in stories:
+            if thumbnail:
+                article_inner = f"""
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding-right:16px;vertical-align:top;">
+                  <a href="{link}" style="font-size:19px;font-weight:700;color:#1e293b;
+                      text-decoration:none;line-height:1.4;display:block;">{title}</a>
+                  <p style="margin:6px 0 0;font-size:16px;color:#64748b;line-height:1.7;">{summary}</p>
+                  <a href="{link}" style="display:inline-block;margin-top:8px;font-size:15px;
+                      color:{color};font-weight:600;text-decoration:none;">Read &rarr;</a>
+                </td>
+                <td width="130" valign="top" style="padding-top:3px;">
+                  <a href="{link}">
+                    <img src="{thumbnail}" width="130" height="88"
+                      style="border-radius:8px;display:block;object-fit:cover;"
+                      alt="">
+                  </a>
+                </td>
+              </tr>
+            </table>"""
+            else:
+                article_inner = f"""
+                  <a href="{link}" style="font-size:19px;font-weight:700;color:#1e293b;
+                      text-decoration:none;line-height:1.4;display:block;">{title}</a>
+                  <p style="margin:6px 0 0;font-size:16px;color:#64748b;line-height:1.7;">{summary}</p>
+                  <a href="{link}" style="display:inline-block;margin-top:8px;font-size:15px;
+                      color:{color};font-weight:600;text-decoration:none;">Read &rarr;</a>"""
             section_html += f"""
         <tr>
-          <td style="padding:14px 32px 0;">
-            <a href="{link}" style="font-size:16px;font-weight:700;color:#1e293b;
-                text-decoration:none;line-height:1.4;display:block;">{title}</a>
-            <p style="margin:5px 0 0;font-size:14px;color:#64748b;line-height:1.65;">{summary}</p>
-            <a href="{link}" style="display:inline-block;margin-top:6px;font-size:13px;
-                color:{color};font-weight:600;text-decoration:none;">Read &rarr;</a>
+          <td style="padding:16px 32px 0;">{article_inner}
           </td>
         </tr>"""
 
@@ -299,31 +358,25 @@ def build_html(sections_data, top_brief, weather, today):
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;padding:28px 0;">
   <tr><td align="center">
   <table width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
-
     <tr>
-      <td style="background:#0f172a;padding:26px 32px;">
-        <p style="margin:0;font-size:12px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">Morning Brief</p>
-        <h1 style="margin:6px 0 0;font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
+      <td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:28px 32px;">
+        <p style="margin:0;font-size:14px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">&#9728; Morning Brief</p>
+        <h1 style="margin:8px 0 0;font-size:32px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
       </td>
     </tr>
-
     {weather_html}
     {brief_html}
-
     <tr><td style="padding:0 32px;">
       <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 0;">
     </td></tr>
-
     {section_html}
-
     <tr>
       <td style="padding:32px;background:#f8fafc;border-top:1px solid #e2e8f0;margin-top:32px;">
-        <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
+        <p style="margin:0;font-size:14px;color:#94a3b8;text-align:center;">
           Generated automatically every weekday morning &middot; Solihull, UK
         </p>
       </td>
     </tr>
-
   </table>
   </td></tr>
 </table>

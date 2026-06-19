@@ -101,7 +101,7 @@ def ai_enhance(section_name, stories):
         f"{i+1}. {title}\n{summary}"
         for i, (title, _, summary) in enumerate(stories)
     )
-    prompt = f"""You are writing a concise morning intelligence brief for a foreign policy professional.
+    prompt = f"""You are Lucy's personal assistant. Lucy is a foreign policy professional. You're briefing her on this section of her morning news.
 
 Section: {section_name}
 
@@ -110,17 +110,17 @@ Articles:
 
 Respond with valid JSON only (no markdown fences):
 {{
-  "synthesis": "A 2-3 sentence analytical paragraph synthesising the key developments in this section right now.",
-  "summaries": ["A sharper 1-2 sentence summary of article 1.", "A sharper 1-2 sentence summary of article 2."]
+  "synthesis": "One punchy sentence — like a PA speaking to their boss — telling Lucy what's happening here and what to watch. Use 'you' not 'one'. Be direct. No formal language.",
+  "summaries": ["Sharp one-sentence summary of article 1 — the key fact only.", "Sharp one-sentence summary of article 2 — the key fact only."]
 }}
 
-Be factual, analytical and direct. Number of summaries must match number of articles ({len(stories)})."""
+Number of summaries must match number of articles ({len(stories)}). Cut all filler words."""
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=600,
+            max_tokens=500,
         )
         data = json.loads(response.choices[0].message.content)
         synthesis = data.get("synthesis", "")
@@ -133,34 +133,68 @@ Be factual, analytical and direct. Number of summaries must match number of arti
     except Exception:
         return None, stories
 
-def build_html(sections_data, today):
+def ai_top_brief(sections_data):
+    all_headlines = []
+    for section, (_, stories) in sections_data.items():
+        for title, _, summary in stories:
+            all_headlines.append(f"[{section}] {title}: {summary[:120]}")
+    if not all_headlines:
+        return None
+    combined = "\n".join(all_headlines[:16])
+    prompt = f"""You are Lucy's personal assistant. She's a foreign policy professional. Based on today's headlines, write her a 2-3 sentence morning briefing — like a PA walking into her office and telling her the 2-3 most important things she needs to know right now. Be direct and conversational. Use "you". No "Good morning". No filler. Just the key things.
+
+Today's headlines:
+{combined}
+
+Reply with just the briefing text. No JSON. No labels."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return None
+
+def build_html(sections_data, top_brief, today):
+    top_html = ""
+    if top_brief:
+        top_html = f"""
+        <tr>
+          <td style="padding:20px 0 0 0;">
+            <div style="background:#1e3a5f;border-radius:6px;padding:16px 20px;">
+              <p style="margin:0 0 4px 0;font-size:11px;font-weight:600;color:#93c5fd;
+                  text-transform:uppercase;letter-spacing:0.08em;">Your brief</p>
+              <p style="margin:0;font-size:15px;color:#ffffff;line-height:1.7;">{top_brief}</p>
+            </div>
+          </td>
+        </tr>"""
+
     section_html = ""
     for section, (synthesis, stories) in sections_data.items():
         section_html += f"""
         <tr>
           <td style="padding:24px 0 8px 0;">
-            <h2 style="margin:0;font-size:16px;font-weight:700;color:#111827;
-                text-transform:uppercase;letter-spacing:0.05em;
-                border-bottom:2px solid #2563eb;padding-bottom:6px;">{section}</h2>
+            <h2 style="margin:0;font-size:13px;font-weight:700;color:#6b7280;
+                text-transform:uppercase;letter-spacing:0.08em;
+                border-bottom:1px solid #e5e7eb;padding-bottom:6px;">{section}</h2>
           </td>
         </tr>"""
         if synthesis:
             section_html += f"""
-        <tr><td style="padding:12px 0 0 0;">
-            <p style="margin:0;font-size:14px;color:#374151;line-height:1.7;
-                background:#f9fafb;border-left:3px solid #2563eb;
-                padding:10px 14px;border-radius:0 4px 4px 0;">{synthesis}</p>
+        <tr><td style="padding:8px 0 0 0;">
+            <p style="margin:0;font-size:14px;color:#111827;line-height:1.6;
+                font-style:italic;">{synthesis}</p>
         </td></tr>"""
         for title, link, summary in stories:
             section_html += f"""
         <tr>
-          <td style="padding:12px 0 0 0;">
-            <a href="{link}" style="font-size:15px;font-weight:600;color:#1d4ed8;
+          <td style="padding:10px 0 0 0;">
+            <a href="{link}" style="font-size:14px;font-weight:600;color:#1d4ed8;
                 text-decoration:none;line-height:1.4;">{title}</a>
-            <p style="margin:4px 0 0 0;font-size:13px;color:#6b7280;line-height:1.6;">{summary}</p>
-            <p style="margin:4px 0 0 0;">
-              <a href="{link}" style="font-size:12px;color:#9ca3af;">Read more →</a>
-            </p>
+            <p style="margin:3px 0 0 0;font-size:13px;color:#6b7280;line-height:1.5;">{summary}</p>
           </td>
         </tr>"""
 
@@ -173,25 +207,18 @@ def build_html(sections_data, today):
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;
           box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">
         <tr>
-          <td style="background:#1e3a5f;padding:28px 32px;">
-            <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">
-              Morning Brief
-            </h1>
-            <p style="margin:4px 0 0 0;font-size:14px;color:#93c5fd;">{today}</p>
+          <td style="background:#0f172a;padding:20px 28px;">
+            <p style="margin:0;font-size:12px;font-weight:600;color:#64748b;
+                text-transform:uppercase;letter-spacing:0.08em;">Morning Brief</p>
+            <p style="margin:2px 0 0 0;font-size:20px;font-weight:700;color:#ffffff;">{today}</p>
           </td>
         </tr>
         <tr>
-          <td style="padding:0 32px 32px 32px;">
+          <td style="padding:0 28px 28px 28px;">
             <table width="100%" cellpadding="0" cellspacing="0">
+              {top_html}
               {section_html}
             </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb;">
-            <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
-              Automated Morning Brief · Generated {today}
-            </p>
           </td>
         </tr>
       </table>
@@ -223,7 +250,8 @@ for section, config in SECTIONS.items():
     synthesis, enhanced = ai_enhance(section, stories)
     sections_data[section] = (synthesis, enhanced)
 
-html = build_html(sections_data, today)
+top_brief = ai_top_brief(sections_data)
+html = build_html(sections_data, top_brief, today)
 ok, detail = send_email(f"Morning Brief — {today}", html)
 if not ok:
     print(f"Failed to send email: {detail}", file=sys.stderr)

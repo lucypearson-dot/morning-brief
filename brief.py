@@ -5,12 +5,14 @@ import sys
 import json
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
-import anthropic
+from openai import OpenAI
 
 RESEND_API_KEY = os.environ["RESEND_API_KEY"]
 TO_EMAIL = os.environ.get("TO_EMAIL", "lucy.pearson@iklcomputing.co.uk")
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+client = OpenAI(
+    base_url="https://models.inference.ai.azure.com",
+    api_key=os.environ["GITHUB_TOKEN"],
+)
 
 SECTIONS = {
     "Foreign Policy": {
@@ -115,12 +117,12 @@ Respond with valid JSON only (no markdown fences):
 Be factual, analytical and direct. Number of summaries must match number of articles ({len(stories)})."""
 
     try:
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
             max_tokens=600,
-            messages=[{"role": "user", "content": prompt}]
         )
-        data = json.loads(message.content[0].text)
+        data = json.loads(response.choices[0].message.content)
         synthesis = data.get("synthesis", "")
         new_summaries = data.get("summaries", [])
         enhanced = [

@@ -6,6 +6,8 @@ on:
 jobs:
   send-brief:
     runs-on: ubuntu-latest
+    permissions:
+      models: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

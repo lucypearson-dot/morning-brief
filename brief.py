@@ -202,17 +202,17 @@ Articles:
 
 Respond with valid JSON only (no markdown fences):
 {{
-  "synthesis": "One direct sentence — like a PA walking into the room and telling Lucy what's happening here. Use 'you' not 'one'. Conversational, punchy, no jargon.",
-  "summaries": ["One crisp sentence: the key fact from article 1, nothing else.", "One crisp sentence: the key fact from article 2, nothing else."]
+  "synthesis": "2-3 sentences summarising the key developments in this section right now — like a PA giving Lucy a quick verbal briefing on everything happening here. Direct, warm, no jargon. Use 'you' not 'one'.",
+  "summaries": ["One crisp sentence: the single most important fact from article 1.", "One crisp sentence: the single most important fact from article 2."]
 }}
 
-Number of summaries must equal {len(stories)}. Be ruthlessly concise."""
+Number of summaries must equal {len(stories)}."""
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=500,
+            max_tokens=600,
         )
         data = json.loads(response.choices[0].message.content)
         synthesis = data.get("synthesis", "")
@@ -259,18 +259,18 @@ def build_html(sections_data, top_brief, weather, today):
     if weather:
         weather_html = f"""
         <tr>
-          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:16px 32px;">
+          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:18px 32px;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="font-size:36px;width:52px;">{weather['icon']}</td>
-                <td style="padding-left:12px;">
-                  <span style="font-size:26px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
-                  <span style="font-size:17px;color:#64748b;margin-left:8px;">{weather['desc']}</span>
-                  <span style="font-size:16px;color:#94a3b8;margin-left:10px;">H:{weather['hi']}&deg; L:{weather['lo']}&deg;</span>
+                <td style="font-size:38px;width:52px;">{weather['icon']}</td>
+                <td style="padding-left:14px;">
+                  <span style="font-size:28px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
+                  <span style="font-size:19px;color:#64748b;margin-left:10px;">{weather['desc']}</span>
+                  <span style="font-size:17px;color:#94a3b8;margin-left:10px;">H:{weather['hi']}&deg; L:{weather['lo']}&deg;</span>
                 </td>
-                <td align="right" style="font-size:16px;color:#64748b;">
+                <td align="right" style="font-size:17px;color:#64748b;">
                   {weather['precip']}% rain &nbsp;&#183;&nbsp; {weather['wind']} km/h wind<br>
-                  <span style="font-size:15px;color:#94a3b8;">Solihull, UK</span>
+                  <span style="font-size:16px;color:#94a3b8;">Solihull, UK</span>
                 </td>
               </tr>
             </table>
@@ -281,11 +281,11 @@ def build_html(sections_data, top_brief, weather, today):
     if top_brief:
         brief_html = f"""
         <tr>
-          <td style="padding:24px 32px 8px;">
-            <div style="background:#0f172a;border-radius:10px;padding:22px 26px;">
-              <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#60a5fa;
+          <td style="padding:26px 32px 8px;">
+            <div style="background:#0f172a;border-radius:10px;padding:24px 28px;">
+              <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#60a5fa;
                   text-transform:uppercase;letter-spacing:0.1em;">&#128338; Your Brief</p>
-              <p style="margin:0;font-size:18px;color:#f1f5f9;line-height:1.75;">{top_brief}</p>
+              <p style="margin:0;font-size:20px;color:#f1f5f9;line-height:1.8;">{top_brief}</p>
             </div>
           </td>
         </tr>"""
@@ -294,22 +294,19 @@ def build_html(sections_data, top_brief, weather, today):
     for section, (synthesis, stories) in sections_data.items():
         color = SECTIONS[section]["color"]
         icon = SECTION_ICONS.get(section, "&#9679;")
+
+        # Section header block with colored background and AI summary as headline
         section_html += f"""
         <tr>
-          <td style="padding:28px 32px 0;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="border-left:4px solid {color};padding-left:12px;">
-                  <p style="margin:0;font-size:13px;font-weight:700;color:{color};
-                      text-transform:uppercase;letter-spacing:0.1em;">{icon}&nbsp; {section}</p>"""
+          <td style="padding:32px 32px 0;">
+            <div style="background:{color}18;border-left:5px solid {color};border-radius:0 8px 8px 0;padding:18px 20px;">
+              <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:{color};
+                  text-transform:uppercase;letter-spacing:0.1em;">{icon}&nbsp; {section}</p>"""
         if synthesis:
             section_html += f"""
-                  <p style="margin:6px 0 0;font-size:17px;color:#374151;line-height:1.7;
-                      font-style:italic;">{synthesis}</p>"""
+              <p style="margin:0;font-size:20px;font-weight:600;color:#1e293b;line-height:1.65;">{synthesis}</p>"""
         section_html += """
-                </td>
-              </tr>
-            </table>
+            </div>
           </td>
         </tr>"""
 
@@ -319,15 +316,15 @@ def build_html(sections_data, top_brief, weather, today):
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="padding-right:16px;vertical-align:top;">
-                  <a href="{link}" style="font-size:19px;font-weight:700;color:#1e293b;
+                  <a href="{link}" style="font-size:20px;font-weight:700;color:#1e293b;
                       text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:6px 0 0;font-size:16px;color:#64748b;line-height:1.7;">{summary}</p>
-                  <a href="{link}" style="display:inline-block;margin-top:8px;font-size:15px;
+                  <p style="margin:8px 0 0;font-size:18px;color:#475569;line-height:1.75;">{summary}</p>
+                  <a href="{link}" style="display:inline-block;margin-top:10px;font-size:16px;
                       color:{color};font-weight:600;text-decoration:none;">Read &rarr;</a>
                 </td>
-                <td width="130" valign="top" style="padding-top:3px;">
+                <td width="140" valign="top" style="padding-top:3px;">
                   <a href="{link}">
-                    <img src="{thumbnail}" width="130" height="88"
+                    <img src="{thumbnail}" width="140" height="95"
                       style="border-radius:8px;display:block;object-fit:cover;"
                       alt="">
                   </a>
@@ -336,14 +333,14 @@ def build_html(sections_data, top_brief, weather, today):
             </table>"""
             else:
                 article_inner = f"""
-                  <a href="{link}" style="font-size:19px;font-weight:700;color:#1e293b;
+                  <a href="{link}" style="font-size:20px;font-weight:700;color:#1e293b;
                       text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:6px 0 0;font-size:16px;color:#64748b;line-height:1.7;">{summary}</p>
-                  <a href="{link}" style="display:inline-block;margin-top:8px;font-size:15px;
+                  <p style="margin:8px 0 0;font-size:18px;color:#475569;line-height:1.75;">{summary}</p>
+                  <a href="{link}" style="display:inline-block;margin-top:10px;font-size:16px;
                       color:{color};font-weight:600;text-decoration:none;">Read &rarr;</a>"""
             section_html += f"""
         <tr>
-          <td style="padding:16px 32px 0;">{article_inner}
+          <td style="padding:18px 32px 0;">{article_inner}
           </td>
         </tr>"""
 
@@ -357,22 +354,22 @@ def build_html(sections_data, top_brief, weather, today):
 <body style="margin:0;padding:0;background:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;padding:28px 0;">
   <tr><td align="center">
-  <table width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+  <table width="660" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
     <tr>
-      <td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:28px 32px;">
+      <td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:30px 32px;">
         <p style="margin:0;font-size:14px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">&#9728; Morning Brief</p>
-        <h1 style="margin:8px 0 0;font-size:32px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
+        <h1 style="margin:8px 0 0;font-size:34px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
       </td>
     </tr>
     {weather_html}
     {brief_html}
     <tr><td style="padding:0 32px;">
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 0;">
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:26px 0 0;">
     </td></tr>
     {section_html}
     <tr>
-      <td style="padding:32px;background:#f8fafc;border-top:1px solid #e2e8f0;margin-top:32px;">
-        <p style="margin:0;font-size:14px;color:#94a3b8;text-align:center;">
+      <td style="padding:36px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;margin-top:32px;">
+        <p style="margin:0;font-size:15px;color:#94a3b8;text-align:center;">
           Generated automatically every weekday morning &middot; Solihull, UK
         </p>
       </td>

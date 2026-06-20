@@ -22,7 +22,7 @@ WEATHER_CODES = {
     45: ("Fog", "&#127787;"), 48: ("Fog", "&#127787;"),
     51: ("Light drizzle", "&#127746;"), 53: ("Drizzle", "&#127746;"), 55: ("Drizzle", "&#127746;"),
     61: ("Light rain", "&#127783;"), 63: ("Rain", "&#127783;"), 65: ("Heavy rain", "&#127783;"),
-    71: ("Light snow", "&#127784;"), 73: ("Snow", "&#127784;"), 75: ("Heavy snow", "&#10052;"),
+    71: ("Light snow", "&#127784;"), 73: ("Snow", "&#127784;"), 75: ("Heavy snow", "&#127784;"),
     80: ("Showers", "&#127746;"), 81: ("Showers", "&#127746;"), 82: ("Heavy showers", "&#9928;"),
     95: ("Thunderstorm", "&#9928;"),
 }
@@ -34,17 +34,15 @@ SECTION_ICONS = {
     "Analyst Views": "&#128203;",
     "UK Politics": "&#127963;",
     "Economy": "&#128200;",
-    "Health": "&#129658;",
-    "Skincare & Wellness": "&#10024;",
-    "Food & Drink": "&#127869;",
+    "Russian Press": "&#128240;",
 }
 
 SECTIONS = {
     "Foreign Policy": {
         "feeds": ["https://feeds.bbci.co.uk/news/world/rss.xml"],
         "keywords": ["foreign", "diplomacy", "diplomatic", "treaty", "summit",
-            "sanction", "conflict", "troops", "alliance", "embassy",
-            "united nations", "war", "ceasefire", "president"],
+                     "sanction", "conflict", "troops", "alliance", "embassy",
+                     "united nations", "war", "ceasefire", "president"],
         "n": 3, "color": "#1d4ed8",
     },
     "Russia & Ukraine": {
@@ -53,7 +51,7 @@ SECTIONS = {
             "https://feeds.bbci.co.uk/news/world/rss.xml",
         ],
         "keywords": ["russia", "russian", "putin", "kremlin", "moscow",
-            "ukraine", "ukrainian", "kyiv", "zelensky", "donbas"],
+                     "ukraine", "ukrainian", "kyiv", "zelensky", "donbas"],
         "n": 3, "color": "#dc2626",
     },
     "NATO": {
@@ -64,7 +62,7 @@ SECTIONS = {
             "https://www.rusi.org/rss/latest-commentary.xml",
         ],
         "keywords": ["nato", "north atlantic", "article 5", "rutte", "stoltenberg",
-            "collective defence", "collective defense", "military alliance"],
+                     "collective defence", "collective defense", "military alliance"],
         "n": 3, "color": "#0369a1",
     },
     "Analyst Views": {
@@ -86,27 +84,19 @@ SECTIONS = {
         "keywords": [],
         "n": 2, "color": "#b45309",
     },
-    "Health": {
-        "feeds": ["https://feeds.bbci.co.uk/news/health/rss.xml"],
-        "keywords": [],
-        "n": 2, "color": "#059669",
-    },
-    "Skincare & Wellness": {
+    "Russian Press": {
         "feeds": [
-            "https://www.theguardian.com/lifeandstyle/health-and-wellbeing/rss",
-            "https://www.theguardian.com/fashion/rss",
+            "https://www.mk.ru/rss/news/",
+            "https://www.pravda.ru/export.xml",
+            "https://www.kommersant.ru/RSS/news.xml",
+            "https://www.themoscowtimes.com/rss/news",
         ],
-        "keywords": ["skin", "skincare", "moisturiser", "moisturizer", "spf",
-            "sunscreen", "retinol", "serum", "wellness", "beauty", "acne",
-            "collagen", "vitamin c", "hyaluronic"],
-        "n": 2, "color": "#db2777",
-    },
-    "Food & Drink": {
-        "feeds": ["https://www.theguardian.com/food/rss"],
         "keywords": [],
-        "n": 2, "color": "#92400e",
+        "n": 4, "color": "#b91c1c",
+        "translate": True,
     },
 }
+
 
 def get_weather():
     try:
@@ -137,6 +127,7 @@ def get_weather():
     except Exception:
         return None
 
+
 def get_thumbnail(entry):
     try:
         if hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
@@ -153,16 +144,53 @@ def get_thumbnail(entry):
         pass
     return ''
 
+
 def get_summary(entry):
     raw = entry.get("summary") or entry.get("description") or ""
     text = BeautifulSoup(raw, "html.parser").get_text(strip=True)
     return text[:400] if text else "Summary unavailable."
+
 
 def matches(title, summary, keywords):
     if not keywords:
         return True
     haystack = (title + " " + summary).lower()
     return any(kw in haystack for kw in keywords)
+
+
+def translate_articles(stories):
+    """Batch-translate article titles and summaries to English using GPT."""
+    if not stories:
+        return stories
+    payload = [{"i": i, "title": t, "summary": s}
+               for i, (t, url, s, thumb) in enumerate(stories)]
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": (
+                "Translate the following news article titles and summaries to English. "
+                "If text is already in English keep it unchanged. "
+                "Return a JSON array with objects containing 'i', 'title', 'summary'. "
+                "No commentary, only the JSON array.\n\n"
+                + json.dumps(payload, ensure_ascii=False)
+            )}],
+            max_tokens=2500,
+        )
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw)
+        translated = list(stories)
+        for item in result:
+            idx = item["i"]
+            _, url, _, thumb = stories[idx]
+            translated[idx] = (item["title"], url, item["summary"], thumb)
+        return translated
+    except Exception:
+        return stories
+
 
 def get_stories(config, default_n=3):
     n = config.get("n", default_n)
@@ -188,80 +216,73 @@ def get_stories(config, default_n=3):
                 combined.append(item)
             if len(combined) >= n:
                 break
-    return combined[:n]
+    if config.get("translate"):
+        combined = translate_articles(combined)
+    return combined
+
 
 def ai_enhance(section_name, stories):
     if not stories:
-        return None, stories
-    articles_text = "\n\n".join(
-        f"{i+1}. {title}\n{summary}"
-        for i, (title, _, summary, _thumb) in enumerate(stories)
+        return None, []
+    story_text = "\n\n".join(
+        f"TITLE: {t}\nSUMMARY: {s}" for t, url, s, thumb in stories
     )
-    prompt = f"""You are Lucy's personal assistant giving her a morning briefing. Section: {section_name}.
-
-Articles:
-{articles_text}
-
-Respond with valid JSON only (no markdown fences):
-{{
-  "synthesis": "5-7 sentences giving Lucy a thorough, substantive briefing on this section. Tell her what is happening, why it matters, what the key tensions or developments are, and what she should watch. Like a knowledgeable PA who has read everything and is walking her through it. Direct, warm, no jargon. Use 'you' not 'one'.",
-  "summaries": ["One crisp sentence: the single most important fact from article 1.", "One crisp sentence: the single most important fact from article 2."]
-}}
-
-Number of summaries must equal {len(stories)}."""
-
+    prompts = {
+        "synthesis": (
+            "5-7 sentences giving Lucy a thorough, substantive briefing on this section. "
+            "Tell her what is happening, why it matters, what the key tensions or developments are, "
+            "and what she should watch. Like a knowledgeable PA who has read everything and is "
+            "walking her through it. Direct, warm, no jargon. Use 'you' not 'one'."
+        ),
+        "headline": "Rewrite this headline to be sharper and more informative. Max 12 words.",
+        "body": "In 2 sentences, explain why this story matters to someone tracking geopolitics and policy.",
+    }
     try:
-        response = client.chat.completions.create(
+        synth_resp = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": (
+                f"You are a knowledgeable PA briefing Lucy on today's '{section_name}' news.\n\n"
+                f"{story_text}\n\n{prompts['synthesis']}"
+            )}],
             max_tokens=800,
         )
-        data = json.loads(response.choices[0].message.content)
-        synthesis = data.get("synthesis", "")
-        new_summaries = data.get("summaries", [])
-        enhanced = [
-            (title, link, new_summaries[i] if i < len(new_summaries) else summary, thumb)
-            for i, (title, link, summary, thumb) in enumerate(stories)
-        ]
+        synthesis = synth_resp.choices[0].message.content.strip()
+        enhanced = []
+        for title, url, summary, thumbnail in stories:
+            try:
+                h_resp = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": (
+                        f"TITLE: {title}\nSUMMARY: {summary}\n\n{prompts['headline']}"
+                    )}],
+                    max_tokens=60,
+                )
+                b_resp = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": (
+                        f"TITLE: {title}\nSUMMARY: {summary}\n\n{prompts['body']}"
+                    )}],
+                    max_tokens=120,
+                )
+                enh_title = h_resp.choices[0].message.content.strip()
+                enh_body = b_resp.choices[0].message.content.strip()
+                enhanced.append((enh_title, url, enh_body, thumbnail))
+            except Exception:
+                enhanced.append((title, url, summary, thumbnail))
         return synthesis, enhanced
     except Exception:
-        return None, stories
+        return None, list(stories)
 
-def ai_top_brief(sections_data, weather):
-    lines = []
-    for section, (_, stories) in sections_data.items():
-        for title, _, summary, _thumb in stories:
-            lines.append(f"[{section}] {title}: {summary[:100]}")
-    if not lines:
-        return None
-    weather_line = ""
-    if weather:
-        weather_line = f"Weather: {weather['desc']}, {weather['temp']}C in Solihull (high {weather['hi']}C, {weather['precip']}% rain chance)."
-    prompt = f"""You are Lucy's personal assistant. She is a foreign policy professional based in Solihull, UK. Brief her in 3-4 sentences max — like walking into her office and telling her the most important things she needs to know right now. Be direct, warm and conversational. No "Good morning". No bullet points. Use "you". Cover the 2-3 biggest stories across all areas, and weave in a practical weather note if relevant.
-
-{weather_line}
-
-Today's headlines:
-{chr(10).join(lines[:20])}
-
-Write the briefing now. Plain text only, no labels."""
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=250,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception:
-        return None
 
 def ai_horoscope(sign):
     today_str = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
-    prompt = f"""Write a daily horoscope for {sign.capitalize()} for {today_str}.
-
-4-5 sentences. Make it feel genuinely specific to today — weave in themes relevant to {sign} like analytical thinking, attention to detail, health, work, relationships, or personal growth. Be warm, encouraging and grounded. Give it real personality. Don't start with the sign name or the date. Plain text only."""
-
+    prompt = (
+        f"Write a daily horoscope for {sign.capitalize()} for {today_str}.\n"
+        "4-5 sentences. Make it feel genuinely specific to today — weave in themes relevant to "
+        f"{sign} like analytical thinking, attention to detail, health, work, relationships, or "
+        "personal growth. Be warm, encouraging and grounded. Give it real personality. "
+        "Don't start with the sign name or the date. Plain text only."
+    )
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -271,117 +292,148 @@ def ai_horoscope(sign):
         return response.choices[0].message.content.strip()
     except Exception:
         return None
+
+
+def ai_top_brief(sections_data, weather):
+    weather_str = ""
+    if weather:
+        weather_str = (
+            f"Weather in Coventry: {weather['temp']}\u00b0C, {weather['desc']}, "
+            f"wind {weather['wind']}km/h, {weather['precip']}% rain chance."
+        )
+    summaries = []
+    for section, (synthesis, stories) in sections_data.items():
+        if synthesis:
+            summaries.append(f"{section}: {synthesis[:200]}")
+    combined = "\n".join(summaries)
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": (
+                f"You are Lucy's personal PA. Write a warm, direct 3-4 sentence morning overview "
+                f"summarising the key themes across today's news sections. {weather_str}\n\n"
+                f"Section summaries:\n{combined}\n\n"
+                "Be conversational and highlight the 2-3 most important threads connecting the day's news. "
+                "Use 'you' not 'one'. No bullet points."
+            )}],
+            max_tokens=300,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return None
+
 
 def build_html(sections_data, top_brief, weather, horoscope, today):
     weather_html = ""
     if weather:
         weather_html = f"""
-        <tr>
-          <td style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:20px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="font-size:44px;width:54px;vertical-align:middle;">{weather['icon']}</td>
-                <td style="padding-left:14px;vertical-align:middle;">
-                  <span style="font-size:32px;font-weight:700;color:#0f172a;">{weather['temp']}&deg;C</span>
-                  <span style="font-size:22px;color:#374151;margin-left:10px;">{weather['desc']}</span><br>
-                  <span style="font-size:18px;color:#64748b;">H:{weather['hi']}&deg; L:{weather['lo']}&deg; &nbsp;&#183;&nbsp; {weather['precip']}% rain &nbsp;&#183;&nbsp; {weather['wind']} km/h &nbsp;&#183;&nbsp; Solihull</span>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>"""
+<tr>
+  <td style="padding:0 20px 20px;">
+    <div style="background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:20px 24px;color:#ffffff;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <span style="font-size:32px;font-weight:800;">{weather['temp']}\u00b0C</span>
+          <span style="font-size:22px;margin-left:8px;">{weather['icon']}</span>
+          <div style="font-size:22px;margin-top:4px;">{weather['desc']}</div>
+          <div style="font-size:18px;margin-top:6px;color:#93c5fd;">
+            &#8593;{weather['hi']}\u00b0 &#8595;{weather['lo']}\u00b0 &nbsp;\u00b7&nbsp; &#127783; {weather['precip']}% &nbsp;\u00b7&nbsp; &#128168; {weather['wind']} km/h
+          </div>
+        </div>
+        <div style="font-size:18px;color:#bfdbfe;text-align:right;">Coventry</div>
+      </div>
+    </div>
+  </td>
+</tr>"""
 
     brief_html = ""
     if top_brief:
         brief_html = f"""
-        <tr>
-          <td style="padding:24px 20px 12px;">
-            <div style="background:#0f172a;border-radius:10px;padding:24px 22px;">
-              <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#60a5fa;
-                  text-transform:uppercase;letter-spacing:0.1em;">&#128338; Your Brief</p>
-              <p style="margin:0;font-size:24px;color:#f1f5f9;line-height:1.75;">{top_brief}</p>
-            </div>
-          </td>
-        </tr>"""
+<tr>
+  <td style="padding:0 20px 20px;">
+    <div style="background:#f0f9ff;border-left:5px solid #2563eb;border-radius:0 10px 10px 0;padding:20px 22px;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.08em;">&#128101; Morning Brief</p>
+      <p style="margin:0;font-size:24px;color:#1e293b;line-height:1.7;">{html_lib.escape(top_brief)}</p>
+    </div>
+  </td>
+</tr>"""
 
     horoscope_html = ""
     if horoscope:
         horoscope_html = f"""
-        <tr>
-          <td style="padding:0 20px 12px;">
-            <div style="background:#fdf4ff;border-left:5px solid #a855f7;border-radius:0 10px 10px 0;padding:20px 22px;">
-              <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#7c3aed;
-                  text-transform:uppercase;letter-spacing:0.08em;">&#9997;&#65039; Virgo &nbsp;&#183;&nbsp; {today}</p>
-              <p style="margin:0;font-size:22px;color:#3b0764;line-height:1.8;">{horoscope}</p>
-            </div>
-          </td>
-        </tr>"""
+<tr>
+  <td style="padding:0 20px 12px;">
+    <div style="background:#fdf4ff;border-left:5px solid #a855f7;border-radius:0 10px 10px 0;padding:20px 22px;">
+      <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;">&#9999;&#65039; Virgo &nbsp;&#183;&nbsp; {today}</p>
+      <p style="margin:0;font-size:22px;color:#3b0764;line-height:1.8;">{html_lib.escape(horoscope)}</p>
+    </div>
+  </td>
+</tr>"""
 
-    section_html = ""
-    for section, (synthesis, stories) in sections_data.items():
-        color = SECTIONS[section]["color"]
-        icon = SECTION_ICONS.get(section, "&#9679;")
-
-        section_html += f"""
-        <tr>
-          <td style="padding:28px 20px 0;">
-            <div style="background:{color}18;border-left:5px solid {color};border-radius:0 8px 8px 0;padding:18px 18px;">
-              <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:{color};
-                  text-transform:uppercase;letter-spacing:0.08em;">{icon}&nbsp; {section}</p>"""
+    sections_html = ""
+    for section_name, (synthesis, stories) in sections_data.items():
+        if not stories:
+            continue
+        color = SECTIONS[section_name]["color"]
+        icon = SECTION_ICONS.get(section_name, "&#128240;")
+        safe_section = html_lib.escape(section_name)
+        synthesis_html = ""
         if synthesis:
-            section_html += f"""
-              <p style="margin:0;font-size:22px;font-weight:600;color:#1e293b;line-height:1.75;">{synthesis}</p>"""
-        section_html += """
-            </div>
-          </td>
-        </tr>"""
-
-        for title, link, summary, thumbnail in stories:
+            safe_synth = html_lib.escape(synthesis)
+            synthesis_html = f"""
+    <tr>
+      <td style="padding:0 20px 16px;">
+        <p style="margin:0;font-size:22px;font-weight:600;color:#1e293b;line-height:1.7;">{safe_synth}</p>
+      </td>
+    </tr>"""
+        articles_html = ""
+        for title, url, body, thumbnail in stories:
             title_attr = html_lib.escape(title, quote=True)
+            safe_title = html_lib.escape(title)
+            safe_body = html_lib.escape(body)
+            safe_url = html_lib.escape(url, quote=True)
+            thumb_html = ""
             if thumbnail:
-                article_inner = f"""
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="padding-right:14px;vertical-align:top;">
-                  <a href="{link}" style="font-size:24px;font-weight:700;color:#1e293b;
-                      text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:10px 0 0;font-size:22px;color:#374151;line-height:1.75;">{summary}</p>
-                  <a href="{link}" aria-label="Read: {title_attr}"
-                      style="display:inline-block;margin-top:14px;font-size:20px;padding:10px 0;
-                      color:{color};font-weight:700;text-decoration:none;">Read &rarr;</a>
-                </td>
-                <td class="thumb" width="130" valign="top" style="padding-top:4px;">
-                  <a href="{link}" tabindex="-1" aria-hidden="true">
-                    <img src="{thumbnail}" width="130" height="88"
-                      style="border-radius:8px;display:block;object-fit:cover;max-width:100%;"
-                      alt="{title_attr}">
-                  </a>
-                </td>
-              </tr>
-            </table>"""
-            else:
-                article_inner = f"""
-                  <a href="{link}" style="font-size:24px;font-weight:700;color:#1e293b;
-                      text-decoration:none;line-height:1.4;display:block;">{title}</a>
-                  <p style="margin:10px 0 0;font-size:22px;color:#374151;line-height:1.75;">{summary}</p>
-                  <a href="{link}" aria-label="Read: {title_attr}"
-                      style="display:inline-block;margin-top:14px;font-size:20px;padding:10px 0;
-                      color:{color};font-weight:700;text-decoration:none;">Read &rarr;</a>"""
-            section_html += f"""
-        <tr>
-          <td style="padding:20px 20px 0;">{article_inner}
-          </td>
-        </tr>"""
+                safe_thumb = html_lib.escape(thumbnail, quote=True)
+                thumb_html = f"""
+          <td class="thumb" width="110" style="padding:0 0 0 16px;vertical-align:top;">
+            <a href="{safe_url}" tabindex="-1" aria-hidden="true">
+              <img src="{safe_thumb}" width="110" height="74" alt="{title_attr}" style="display:block;border-radius:8px;object-fit:cover;width:110px;height:74px;">
+            </a>
+          </td>"""
+            articles_html += f"""
+    <tr>
+      <td style="padding:0 20px 20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="vertical-align:top;">
+              <a href="{safe_url}" style="text-decoration:none;color:#1e293b;" aria-label="Read: {title_attr}">
+                <p style="margin:0 0 8px;font-size:24px;font-weight:700;line-height:1.4;color:#1e293b;">{safe_title}</p>
+              </a>
+              <p style="margin:0 0 10px;font-size:22px;color:#374151;line-height:1.6;">{safe_body}</p>
+              <a href="{safe_url}" aria-label="Read: {title_attr}" style="font-size:20px;color:{color};font-weight:600;text-decoration:none;display:inline-block;padding:10px 0;">Read &#8594;</a>
+            </td>{thumb_html}
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <tr><td style="padding:0 20px;"><hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 16px;"></td></tr>"""
+        sections_html += f"""
+<tr>
+  <td style="background:{color};padding:14px 20px;">
+    <h2 style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.04em;">{icon} {safe_section}</h2>
+  </td>
+</tr>
+{synthesis_html}
+{articles_html}"""
 
-    return f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light">
-<title>Morning Brief</title>
+<title>Morning Brief &#8211; {today}</title>
 <style>
-  body {{ -webkit-text-size-adjust: 100%; margin: 0; padding: 0; }}
+  body {{ margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }}
   @media only screen and (max-width: 620px) {{
     .email-outer {{ padding: 0 !important; }}
     .email-card {{ border-radius: 0 !important; box-shadow: none !important; }}
@@ -391,52 +443,35 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
   }}
 </style>
 </head>
-<body style="background:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e2e8f0;">
-  <tr><td class="email-outer" align="center" style="padding:20px 8px;">
-  <table class="email-card" role="presentation" width="100%" cellpadding="0" cellspacing="0"
-      style="background:#ffffff;max-width:620px;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
-    <tr>
-      <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:28px 20px;">
-        <p style="margin:0;font-size:14px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.12em;">&#9728; Morning Brief</p>
-        <h1 style="margin:8px 0 0;font-size:30px;font-weight:800;color:#ffffff;line-height:1.2;">{today}</h1>
-      </td>
-    </tr>
-    {weather_html}
-    {brief_html}
-    {horoscope_html}
-    <tr><td style="padding:0 20px;">
-      <hr role="presentation" style="border:none;border-top:1px solid #e2e8f0;margin:22px 0 0;">
-    </td></tr>
-    {section_html}
-    <tr>
-      <td style="padding:30px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-        <p style="margin:0;font-size:16px;color:#64748b;text-align:center;">
-          Generated automatically every weekday morning &middot; Solihull, UK
-        </p>
-      </td>
-    </tr>
-  </table>
-  </td></tr>
+<body>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;min-height:100vh;">
+  <tr>
+    <td class="email-outer" align="center" style="padding:24px 16px;">
+      <table class="email-card" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;max-width:620px;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+        <tr>
+          <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:28px 24px;">
+            <h1 style="margin:0;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">&#9788; Morning Brief</h1>
+            <p style="margin:6px 0 0;font-size:16px;color:#94a3b8;">{today}</p>
+          </td>
+        </tr>
+        {weather_html}
+        {brief_html}
+        {horoscope_html}
+        <tr><td style="padding:0 20px 20px;"><hr style="border:none;border-top:2px solid #e2e8f0;margin:0;"></td></tr>
+        {sections_html}
+        <tr>
+          <td style="padding:24px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:16px;color:#64748b;text-align:center;">Delivered by Morning Brief &nbsp;&#183;&nbsp; {today}</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 </table>
 </body>
 </html>"""
+    return html
 
-def send_email(subject, html):
-    resp = requests.post(
-        "https://api.resend.com/emails",
-        headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "from": "Morning Brief <onboarding@resend.dev>",
-            "to": [TO_EMAIL],
-            "subject": subject,
-            "html": html,
-        },
-    )
-    return resp.ok, resp.text
 
 today = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
 weather = get_weather()
@@ -446,11 +481,20 @@ for section, config in SECTIONS.items():
     stories = get_stories(config)
     synthesis, enhanced = ai_enhance(section, stories)
     sections_data[section] = (synthesis, enhanced)
-
 top_brief = ai_top_brief(sections_data, weather)
 html = build_html(sections_data, top_brief, weather, horoscope, today)
-ok, detail = send_email(f"Morning Brief — {today}", html)
-if not ok:
-    print(f"Failed: {detail}", file=sys.stderr)
-    sys.exit(1)
-print("Brief sent successfully.")
+
+payload = {
+    "from": "Morning Brief <onboarding@resend.dev>",
+    "to": [TO_EMAIL],
+    "subject": f"&#9788; Morning Brief &#8211; {today}",
+    "html": html,
+}
+resp = requests.post(
+    "https://api.resend.com/emails",
+    headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+    json=payload,
+    timeout=30,
+)
+resp.raise_for_status()
+print(f"Sent to {TO_EMAIL}: {resp.json()}")

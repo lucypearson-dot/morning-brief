@@ -91,7 +91,18 @@ SECTIONS = {
             "https://www.kommersant.ru/RSS/news.xml",
             "https://www.themoscowtimes.com/rss/news",
         ],
-        "keywords": [],
+        "keywords": [
+            # Russian-language political terms (matched before translation)
+            "Ð¿Ð¾Ð»Ð¸ÑÐ¸Ðº", "Ð²ÑÐ±Ð¾ÑÑ", "ÐºÑÐµÐ¼Ð»Ñ", "Ð¿ÑÑÐ¸Ð½", "ÑÐ°Ð½ÐºÑÐ¸", "Ð²Ð¾Ð¹Ð½Ð°",
+            "Ð¼Ð¸Ð½Ð¸ÑÑÑ", "Ð´ÑÐ¼Ð°", "Ð¿Ð°ÑÐ»Ð°Ð¼ÐµÐ½Ñ", "Ð¿ÑÐµÐ·Ð¸Ð´ÐµÐ½Ñ", "Ð¿ÑÐ°Ð²Ð¸ÑÐµÐ»ÑÑÑÐ²",
+            "Ð´ÐµÐ¿ÑÑÐ°Ñ", "Ð¿Ð°ÑÑÐ¸Ñ", "Ð½Ð°ÑÐ¾", "ÑÐºÑÐ°Ð¸Ð½", "Ð¼Ð¸Ð´", "Ð·Ð°ÐºÐ¾Ð½",
+            "Ð¿ÐµÑÐµÐ³Ð¾Ð²Ð¾Ñ", "Ð´Ð¸Ð¿Ð»Ð¾Ð¼Ð°Ñ", "Ð²Ð¾Ð¾ÑÑÐ¶", "Ð°ÑÐ¼Ð¸Ñ", "Ð¾Ð¿Ð¿Ð¾Ð·Ð¸Ñ",
+            # English terms for Moscow Times
+            "politics", "political", "election", "kremlin", "sanction",
+            "parliament", "president", "government", "nato", "ukraine",
+            "minister", "duma", "diplomat", "military", "opposition",
+            "treaty", "ceasefire", "war", "putin", "zelensky",
+        ],
         "n": 4, "color": "#b91c1c",
         "translate": True,
     },
@@ -177,6 +188,7 @@ def translate_articles(stories):
             max_tokens=2500,
         )
         raw = response.choices[0].message.content.strip()
+        # Strip markdown code fences if present
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
@@ -238,6 +250,7 @@ def ai_enhance(section_name, stories):
         "body": "In 2 sentences, explain why this story matters to someone tracking geopolitics and policy.",
     }
     try:
+        # Synthesis
         synth_resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": (
@@ -247,6 +260,8 @@ def ai_enhance(section_name, stories):
             max_tokens=800,
         )
         synthesis = synth_resp.choices[0].message.content.strip()
+
+        # Enhance individual stories
         enhanced = []
         for title, url, summary, thumbnail in stories:
             try:
@@ -278,7 +293,7 @@ def ai_horoscope(sign):
     today_str = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
     prompt = (
         f"Write a daily horoscope for {sign.capitalize()} for {today_str}.\n"
-        "4-5 sentences. Make it feel genuinely specific to today — weave in themes relevant to "
+        "4-5 sentences. Make it feel genuinely specific to today â weave in themes relevant to "
         f"{sign} like analytical thinking, attention to detail, health, work, relationships, or "
         "personal growth. Be warm, encouraging and grounded. Give it real personality. "
         "Don't start with the sign name or the date. Plain text only."
@@ -298,7 +313,7 @@ def ai_top_brief(sections_data, weather):
     weather_str = ""
     if weather:
         weather_str = (
-            f"Weather in Coventry: {weather['temp']}\u00b0C, {weather['desc']}, "
+            f"Weather in Coventry: {weather['temp']}Â°C, {weather['desc']}, "
             f"wind {weather['wind']}km/h, {weather['precip']}% rain chance."
         )
     summaries = []
@@ -324,51 +339,63 @@ def ai_top_brief(sections_data, weather):
 
 
 def build_html(sections_data, top_brief, weather, horoscope, today):
+    # ââ weather block ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     weather_html = ""
     if weather:
         weather_html = f"""
 <tr>
   <td style="padding:0 20px 20px;">
-    <div style="background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);border-radius:12px;padding:20px 24px;color:#ffffff;">
+    <div style="background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);
+        border-radius:12px;padding:20px 24px;color:#ffffff;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div>
-          <span style="font-size:32px;font-weight:800;">{weather['temp']}\u00b0C</span>
+          <span style="font-size:32px;font-weight:800;">{weather['temp']}Â°C</span>
           <span style="font-size:22px;margin-left:8px;">{weather['icon']}</span>
           <div style="font-size:22px;margin-top:4px;">{weather['desc']}</div>
           <div style="font-size:18px;margin-top:6px;color:#93c5fd;">
-            &#8593;{weather['hi']}\u00b0 &#8595;{weather['lo']}\u00b0 &nbsp;\u00b7&nbsp; &#127783; {weather['precip']}% &nbsp;\u00b7&nbsp; &#128168; {weather['wind']} km/h
+            &#8593;{weather['hi']}Â° &#8595;{weather['lo']}Â° &nbsp;Â·&nbsp;
+            &#127783; {weather['precip']}% &nbsp;Â·&nbsp; &#128168; {weather['wind']} km/h
           </div>
         </div>
-        <div style="font-size:18px;color:#bfdbfe;text-align:right;">Coventry</div>
+        <div style="font-size:18px;color:#bfdbfe;text-align:right;">
+          Coventry
+        </div>
       </div>
     </div>
   </td>
 </tr>"""
 
+    # ââ PA brief block âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     brief_html = ""
     if top_brief:
         brief_html = f"""
 <tr>
   <td style="padding:0 20px 20px;">
-    <div style="background:#f0f9ff;border-left:5px solid #2563eb;border-radius:0 10px 10px 0;padding:20px 22px;">
-      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:0.08em;">&#128101; Morning Brief</p>
+    <div style="background:#f0f9ff;border-left:5px solid #2563eb;
+        border-radius:0 10px 10px 0;padding:20px 22px;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1e40af;
+          text-transform:uppercase;letter-spacing:0.08em;">&#128101; Morning Brief</p>
       <p style="margin:0;font-size:24px;color:#1e293b;line-height:1.7;">{html_lib.escape(top_brief)}</p>
     </div>
   </td>
 </tr>"""
 
+    # ââ horoscope block ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     horoscope_html = ""
     if horoscope:
         horoscope_html = f"""
 <tr>
   <td style="padding:0 20px 12px;">
-    <div style="background:#fdf4ff;border-left:5px solid #a855f7;border-radius:0 10px 10px 0;padding:20px 22px;">
-      <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.08em;">&#9999;&#65039; Virgo &nbsp;&#183;&nbsp; {today}</p>
+    <div style="background:#fdf4ff;border-left:5px solid #a855f7;
+        border-radius:0 10px 10px 0;padding:20px 22px;">
+      <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#7c3aed;
+          text-transform:uppercase;letter-spacing:0.08em;">&#9999;&#65039; Virgo &nbsp;&#183;&nbsp; {today}</p>
       <p style="margin:0;font-size:22px;color:#3b0764;line-height:1.8;">{html_lib.escape(horoscope)}</p>
     </div>
   </td>
 </tr>"""
 
+    # ââ news sections ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     sections_html = ""
     for section_name, (synthesis, stories) in sections_data.items():
         if not stories:
@@ -376,56 +403,77 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
         color = SECTIONS[section_name]["color"]
         icon = SECTION_ICONS.get(section_name, "&#128240;")
         safe_section = html_lib.escape(section_name)
+
         synthesis_html = ""
         if synthesis:
             safe_synth = html_lib.escape(synthesis)
             synthesis_html = f"""
     <tr>
       <td style="padding:0 20px 16px;">
-        <p style="margin:0;font-size:22px;font-weight:600;color:#1e293b;line-height:1.7;">{safe_synth}</p>
+        <p style="margin:0;font-size:22px;font-weight:600;color:#1e293b;line-height:1.7;">
+          {safe_synth}
+        </p>
       </td>
     </tr>"""
+
         articles_html = ""
         for title, url, body, thumbnail in stories:
             title_attr = html_lib.escape(title, quote=True)
             safe_title = html_lib.escape(title)
             safe_body = html_lib.escape(body)
             safe_url = html_lib.escape(url, quote=True)
+
             thumb_html = ""
             if thumbnail:
                 safe_thumb = html_lib.escape(thumbnail, quote=True)
                 thumb_html = f"""
           <td class="thumb" width="110" style="padding:0 0 0 16px;vertical-align:top;">
             <a href="{safe_url}" tabindex="-1" aria-hidden="true">
-              <img src="{safe_thumb}" width="110" height="74" alt="{title_attr}" style="display:block;border-radius:8px;object-fit:cover;width:110px;height:74px;">
+              <img src="{safe_thumb}" width="110" height="74"
+                   alt="{title_attr}"
+                   style="display:block;border-radius:8px;object-fit:cover;width:110px;height:74px;">
             </a>
           </td>"""
+
             articles_html += f"""
     <tr>
       <td style="padding:0 20px 20px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td style="vertical-align:top;">
-              <a href="{safe_url}" style="text-decoration:none;color:#1e293b;" aria-label="Read: {title_attr}">
-                <p style="margin:0 0 8px;font-size:24px;font-weight:700;line-height:1.4;color:#1e293b;">{safe_title}</p>
+              <a href="{safe_url}" style="text-decoration:none;color:#1e293b;"
+                 aria-label="Read: {title_attr}">
+                <p style="margin:0 0 8px;font-size:24px;font-weight:700;line-height:1.4;
+                    color:#1e293b;">{safe_title}</p>
               </a>
-              <p style="margin:0 0 10px;font-size:22px;color:#374151;line-height:1.6;">{safe_body}</p>
-              <a href="{safe_url}" aria-label="Read: {title_attr}" style="font-size:20px;color:{color};font-weight:600;text-decoration:none;display:inline-block;padding:10px 0;">Read &#8594;</a>
+              <p style="margin:0 0 10px;font-size:22px;color:#374151;line-height:1.6;">
+                {safe_body}
+              </p>
+              <a href="{safe_url}"
+                 aria-label="Read: {title_attr}"
+                 style="font-size:20px;color:{color};font-weight:600;text-decoration:none;
+                        display:inline-block;padding:10px 0;">
+                Read &#8594;
+              </a>
             </td>{thumb_html}
           </tr>
         </table>
       </td>
     </tr>
     <tr><td style="padding:0 20px;"><hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 16px;"></td></tr>"""
+
         sections_html += f"""
 <tr>
   <td style="background:{color};padding:14px 20px;">
-    <h2 style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.04em;">{icon} {safe_section}</h2>
+    <h2 style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.04em;">
+      {icon} {safe_section}
+    </h2>
   </td>
 </tr>
 {synthesis_html}
 {articles_html}"""
 
+    # ââ full HTML ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -444,26 +492,51 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
 </style>
 </head>
 <body>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;min-height:100vh;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+    style="background:#f1f5f9;min-height:100vh;">
   <tr>
     <td class="email-outer" align="center" style="padding:24px 16px;">
-      <table class="email-card" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;max-width:620px;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+      <table class="email-card" role="presentation" width="100%" cellpadding="0" cellspacing="0"
+          style="background:#ffffff;max-width:620px;border-radius:14px;overflow:hidden;
+                 box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+
+        <!-- Header -->
         <tr>
-          <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:28px 24px;">
-            <h1 style="margin:0;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">&#9788; Morning Brief</h1>
+          <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
+              padding:28px 24px;">
+            <h1 style="margin:0;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
+              &#9788; Morning Brief
+            </h1>
             <p style="margin:6px 0 0;font-size:16px;color:#94a3b8;">{today}</p>
           </td>
         </tr>
+
+        <!-- Weather -->
         {weather_html}
+
+        <!-- PA brief -->
         {brief_html}
+
+        <!-- Horoscope -->
         {horoscope_html}
-        <tr><td style="padding:0 20px 20px;"><hr style="border:none;border-top:2px solid #e2e8f0;margin:0;"></td></tr>
+
+        <!-- Divider -->
+        <tr><td style="padding:0 20px 20px;">
+          <hr style="border:none;border-top:2px solid #e2e8f0;margin:0;">
+        </td></tr>
+
+        <!-- News sections -->
         {sections_html}
+
+        <!-- Footer -->
         <tr>
           <td style="padding:24px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-            <p style="margin:0;font-size:16px;color:#64748b;text-align:center;">Delivered by Morning Brief &nbsp;&#183;&nbsp; {today}</p>
+            <p style="margin:0;font-size:16px;color:#64748b;text-align:center;">
+              Delivered by Morning Brief &nbsp;&#183;&nbsp; {today}
+            </p>
           </td>
         </tr>
+
       </table>
     </td>
   </tr>
@@ -473,6 +546,7 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
     return html
 
 
+# ââ main âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 today = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
 weather = get_weather()
 horoscope = ai_horoscope(STAR_SIGN)

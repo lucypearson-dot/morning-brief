@@ -105,6 +105,7 @@ SECTIONS = {
         ],
         "n": 4, "color": "#b91c1c",
         "translate": True,
+        "strict": True,
     },
 }
 
@@ -222,7 +223,7 @@ def get_stories(config, default_n=3):
             else:
                 fallback.append((entry.title, entry.link, summary, thumbnail))
     combined = hits[:n]
-    if len(combined) < n:
+    if not config.get("strict") and len(combined) < n:
         for item in fallback:
             if item not in combined:
                 combined.append(item)
@@ -244,7 +245,8 @@ def ai_enhance(section_name, stories):
             "5-7 sentences giving Lucy a thorough, substantive briefing on this section. "
             "Tell her what is happening, why it matters, what the key tensions or developments are, "
             "and what she should watch. Like a knowledgeable PA who has read everything and is "
-            "walking her through it. Direct, warm, no jargon. Use 'you' not 'one'."
+            "walking her through it. Direct, warm, no jargon. Use 'you' not 'one'. "
+            "Do NOT start your response with the section name or repeat it."
         ),
         "headline": "Rewrite this headline to be sharper and more informative. Max 12 words.",
         "body": "In 2 sentences, explain why this story matters to someone tracking geopolitics and policy.",
@@ -375,7 +377,7 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
         border-radius:0 10px 10px 0;padding:20px 22px;">
       <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1e40af;
           text-transform:uppercase;letter-spacing:0.08em;">&#128101; Morning Brief</p>
-      <p style="margin:0;font-size:24px;color:#1e293b;line-height:1.7;">{html_lib.escape(top_brief)}</p>
+      <p style="margin:0;font-size:18px;color:#1e293b;line-height:1.7;">{html_lib.escape(top_brief)}</p>
     </div>
   </td>
 </tr>"""
@@ -390,7 +392,7 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
         border-radius:0 10px 10px 0;padding:20px 22px;">
       <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#7c3aed;
           text-transform:uppercase;letter-spacing:0.08em;">&#9999;&#65039; Virgo &nbsp;&#183;&nbsp; {today}</p>
-      <p style="margin:0;font-size:22px;color:#3b0764;line-height:1.8;">{html_lib.escape(horoscope)}</p>
+      <p style="margin:0;font-size:18px;color:#3b0764;line-height:1.8;">{html_lib.escape(horoscope)}</p>
     </div>
   </td>
 </tr>"""
@@ -410,7 +412,7 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
             synthesis_html = f"""
     <tr>
       <td style="padding:0 20px 16px;">
-        <p style="margin:0;font-size:22px;font-weight:600;color:#1e293b;line-height:1.7;">
+        <p style="margin:0;font-size:18px;font-weight:600;color:#1e293b;line-height:1.7;">
           {safe_synth}
         </p>
       </td>
@@ -446,12 +448,12 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
                 <p style="margin:0 0 8px;font-size:24px;font-weight:700;line-height:1.4;
                     color:#1e293b;">{safe_title}</p>
               </a>
-              <p style="margin:0 0 10px;font-size:22px;color:#374151;line-height:1.6;">
+              <p style="margin:0 0 10px;font-size:18px;color:#374151;line-height:1.6;">
                 {safe_body}
               </p>
               <a href="{safe_url}"
                  aria-label="Read: {title_attr}"
-                 style="font-size:20px;color:{color};font-weight:600;text-decoration:none;
+                 style="font-size:16px;color:{color};font-weight:600;text-decoration:none;
                         display:inline-block;padding:10px 0;">
                 Read &#8594;
               </a>
@@ -561,7 +563,7 @@ html = build_html(sections_data, top_brief, weather, horoscope, today)
 payload = {
     "from": "Morning Brief <onboarding@resend.dev>",
     "to": [TO_EMAIL],
-    "subject": f"&#9788; Morning Brief &#8211; {today}",
+    "subject": f"â Morning Brief â {today}",
     "html": html,
 }
 resp = requests.post(

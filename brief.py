@@ -377,10 +377,13 @@ def build_html(sections_data, top_brief, weather, today):
             safe_synth = html_lib.escape(synthesis)
             synthesis_html = f"""
     <tr>
-      <td style="padding:0 20px 16px;">
-        <p style="margin:0;font-size:18px;font-weight:600;color:#1e293b;line-height:1.7;">
-          {safe_synth}
-        </p>
+      <td style="padding:0 20px 18px;">
+        <div style="background:#f8fafc;border-left:3px solid {color};
+            border-radius:0 8px 8px 0;padding:14px 16px;">
+          <p style="margin:0;font-size:18px;font-weight:600;color:#1e293b;line-height:1.7;">
+            {safe_synth}
+          </p>
+        </div>
       </td>
     </tr>"""
 
@@ -433,10 +436,20 @@ def build_html(sections_data, top_brief, weather, today):
 
         sections_html += f"""
 <tr>
-  <td style="background:{color};padding:14px 20px;">
-    <h2 style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.04em;">
-      <span aria-hidden="true">{icon}</span> {safe_section}
-    </h2>
+  <td style="padding:30px 20px 14px;">
+    <table role="presentation" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="34" height="34" style="width:34px;height:34px;background:{color};
+            border-radius:9px;text-align:center;vertical-align:middle;font-size:17px;line-height:34px;">
+          <span aria-hidden="true">{icon}</span>
+        </td>
+        <td style="padding-left:12px;vertical-align:middle;">
+          <h2 style="margin:0;font-size:21px;font-weight:800;color:#0f172a;letter-spacing:-0.2px;">
+            {safe_section}
+          </h2>
+        </td>
+      </tr>
+    </table>
   </td>
 </tr>
 {synthesis_html}
@@ -476,7 +489,7 @@ def build_html(sections_data, top_brief, weather, today):
             <h1 style="margin:0;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
               <span aria-hidden="true">&#9788;</span> Morning Brief
             </h1>
-            <p style="margin:6px 0 0;font-size:16px;color:#94a3b8;">{today}</p>
+            <p style="margin:6px 0 0;font-size:16px;color:#94a3b8;">Good morning, Lucy &nbsp;&#183;&nbsp; {today}</p>
           </td>
         </tr>
 

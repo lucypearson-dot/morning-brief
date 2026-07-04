@@ -5,12 +5,13 @@ import sys
 import json
 import html as html_lib
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 from openai import OpenAI
 
 RESEND_API_KEY = os.environ["RESEND_API_KEY"]
 TO_EMAIL = os.environ.get("TO_EMAIL", "lucy.pearson@iklcomputing.co.uk")
-STAR_SIGN = "virgo"
+LONDON = ZoneInfo("Europe/London")
 client = OpenAI(
     base_url="https://models.inference.ai.azure.com",
     api_key=os.environ["GITHUB_TOKEN"],
@@ -93,10 +94,10 @@ SECTIONS = {
         ],
         "keywords": [
             # Russian-language political terms (matched before translation)
-            "Ð¿Ð¾Ð»Ð¸ÑÐ¸Ðº", "Ð²ÑÐ±Ð¾ÑÑ", "ÐºÑÐµÐ¼Ð»Ñ", "Ð¿ÑÑÐ¸Ð½", "ÑÐ°Ð½ÐºÑÐ¸", "Ð²Ð¾Ð¹Ð½Ð°",
-            "Ð¼Ð¸Ð½Ð¸ÑÑÑ", "Ð´ÑÐ¼Ð°", "Ð¿Ð°ÑÐ»Ð°Ð¼ÐµÐ½Ñ", "Ð¿ÑÐµÐ·Ð¸Ð´ÐµÐ½Ñ", "Ð¿ÑÐ°Ð²Ð¸ÑÐµÐ»ÑÑÑÐ²",
-            "Ð´ÐµÐ¿ÑÑÐ°Ñ", "Ð¿Ð°ÑÑÐ¸Ñ", "Ð½Ð°ÑÐ¾", "ÑÐºÑÐ°Ð¸Ð½", "Ð¼Ð¸Ð´", "Ð·Ð°ÐºÐ¾Ð½",
-            "Ð¿ÐµÑÐµÐ³Ð¾Ð²Ð¾Ñ", "Ð´Ð¸Ð¿Ð»Ð¾Ð¼Ð°Ñ", "Ð²Ð¾Ð¾ÑÑÐ¶", "Ð°ÑÐ¼Ð¸Ñ", "Ð¾Ð¿Ð¿Ð¾Ð·Ð¸Ñ",
+            "политик", "выбор", "кремл", "путин", "санкц", "войн",
+            "министр", "дум", "парламент", "президент", "правительств",
+            "депутат", "парти", "нато", "украин", "мид", "закон",
+            "переговор", "дипломат", "вооруж", "арми", "оппозици",
             # English terms for Moscow Times
             "politics", "political", "election", "kremlin", "sanction",
             "parliament", "president", "government", "nato", "ukraine",
@@ -291,31 +292,11 @@ def ai_enhance(section_name, stories):
         return None, list(stories)
 
 
-def ai_horoscope(sign):
-    today_str = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
-    prompt = (
-        f"Write a daily horoscope for {sign.capitalize()} for {today_str}.\n"
-        "4-5 sentences. Make it feel genuinely specific to today â weave in themes relevant to "
-        f"{sign} like analytical thinking, attention to detail, health, work, relationships, or "
-        "personal growth. Be warm, encouraging and grounded. Give it real personality. "
-        "Don't start with the sign name or the date. Plain text only."
-    )
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=250,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception:
-        return None
-
-
 def ai_top_brief(sections_data, weather):
     weather_str = ""
     if weather:
         weather_str = (
-            f"Weather in Coventry: {weather['temp']}Â°C, {weather['desc']}, "
+            f"Weather in Coventry: {weather['temp']}°C, {weather['desc']}, "
             f"wind {weather['wind']}km/h, {weather['precip']}% rain chance."
         )
     summaries = []
@@ -340,8 +321,8 @@ def ai_top_brief(sections_data, weather):
         return None
 
 
-def build_html(sections_data, top_brief, weather, horoscope, today):
-    # ââ weather block ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+def build_html(sections_data, top_brief, weather, today):
+    # ---- weather block ----
     weather_html = ""
     if weather:
         weather_html = f"""
@@ -351,12 +332,12 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
         border-radius:12px;padding:20px 24px;color:#ffffff;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div>
-          <span style="font-size:32px;font-weight:800;">{weather['temp']}Â°C</span>
+          <span style="font-size:32px;font-weight:800;">{weather['temp']}°C</span>
           <span style="font-size:22px;margin-left:8px;">{weather['icon']}</span>
           <div style="font-size:22px;margin-top:4px;">{weather['desc']}</div>
           <div style="font-size:18px;margin-top:6px;color:#93c5fd;">
-            &#8593;{weather['hi']}Â° &#8595;{weather['lo']}Â° &nbsp;Â·&nbsp;
-            &#127783; {weather['precip']}% &nbsp;Â·&nbsp; &#128168; {weather['wind']} km/h
+            &#8593;{weather['hi']}° &#8595;{weather['lo']}° &nbsp;&#183;&nbsp;
+            &#127783; {weather['precip']}% &nbsp;&#183;&nbsp; &#128168; {weather['wind']} km/h
           </div>
         </div>
         <div style="font-size:18px;color:#bfdbfe;text-align:right;">
@@ -367,7 +348,7 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
   </td>
 </tr>"""
 
-    # ââ PA brief block âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ---- PA brief block ----
     brief_html = ""
     if top_brief:
         brief_html = f"""
@@ -376,28 +357,13 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
     <div style="background:#f0f9ff;border-left:5px solid #2563eb;
         border-radius:0 10px 10px 0;padding:20px 22px;">
       <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1e40af;
-          text-transform:uppercase;letter-spacing:0.08em;">&#128101; Morning Brief</p>
+          text-transform:uppercase;letter-spacing:0.08em;"><span aria-hidden="true">&#128101;</span> Morning Brief</p>
       <p style="margin:0;font-size:18px;color:#1e293b;line-height:1.7;">{html_lib.escape(top_brief)}</p>
     </div>
   </td>
 </tr>"""
 
-    # ââ horoscope block ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-    horoscope_html = ""
-    if horoscope:
-        horoscope_html = f"""
-<tr>
-  <td style="padding:0 20px 12px;">
-    <div style="background:#fdf4ff;border-left:5px solid #a855f7;
-        border-radius:0 10px 10px 0;padding:20px 22px;">
-      <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#7c3aed;
-          text-transform:uppercase;letter-spacing:0.08em;">&#9999;&#65039; Virgo &nbsp;&#183;&nbsp; {today}</p>
-      <p style="margin:0;font-size:18px;color:#3b0764;line-height:1.8;">{html_lib.escape(horoscope)}</p>
-    </div>
-  </td>
-</tr>"""
-
-    # ââ news sections ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ---- news sections ----
     sections_html = ""
     for section_name, (synthesis, stories) in sections_data.items():
         if not stories:
@@ -440,10 +406,11 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
             articles_html += f"""
     <tr>
       <td style="padding:0 20px 20px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+            style="border-left:3px solid {color};">
           <tr>
-            <td style="vertical-align:top;">
-              <a href="{safe_url}" style="text-decoration:none;color:#1e293b;"
+            <td style="vertical-align:top;padding:2px 0 2px 14px;">
+              <a href="{safe_url}" style="text-decoration:underline;text-decoration-color:#cbd5e1;color:#1e293b;"
                  aria-label="Read: {title_attr}">
                 <p style="margin:0 0 8px;font-size:24px;font-weight:700;line-height:1.4;
                     color:#1e293b;">{safe_title}</p>
@@ -454,8 +421,8 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
               <a href="{safe_url}"
                  aria-label="Read: {title_attr}"
                  style="font-size:16px;color:{color};font-weight:600;text-decoration:none;
-                        display:inline-block;padding:10px 0;">
-                Read &#8594;
+                        display:inline-block;padding:12px 8px 12px 0;">
+                Read <span aria-hidden="true">&#8594;</span>
               </a>
             </td>{thumb_html}
           </tr>
@@ -468,14 +435,14 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
 <tr>
   <td style="background:{color};padding:14px 20px;">
     <h2 style="margin:0;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.04em;">
-      {icon} {safe_section}
+      <span aria-hidden="true">{icon}</span> {safe_section}
     </h2>
   </td>
 </tr>
 {synthesis_html}
 {articles_html}"""
 
-    # ââ full HTML ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+    # ---- full HTML ----
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -507,7 +474,7 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
           <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
               padding:28px 24px;">
             <h1 style="margin:0;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
-              &#9788; Morning Brief
+              <span aria-hidden="true">&#9788;</span> Morning Brief
             </h1>
             <p style="margin:6px 0 0;font-size:16px;color:#94a3b8;">{today}</p>
           </td>
@@ -518,9 +485,6 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
 
         <!-- PA brief -->
         {brief_html}
-
-        <!-- Horoscope -->
-        {horoscope_html}
 
         <!-- Divider -->
         <tr><td style="padding:0 20px 20px;">
@@ -533,7 +497,7 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
         <!-- Footer -->
         <tr>
           <td style="padding:24px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-            <p style="margin:0;font-size:16px;color:#64748b;text-align:center;">
+            <p style="margin:0;font-size:16px;color:#475569;text-align:center;">
               Delivered by Morning Brief &nbsp;&#183;&nbsp; {today}
             </p>
           </td>
@@ -548,22 +512,30 @@ def build_html(sections_data, top_brief, weather, horoscope, today):
     return html
 
 
-# ââ main âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
-today = datetime.now(timezone.utc).strftime("%A %-d %B %Y")
+# ---- main ----
+now_london = datetime.now(LONDON)
+today = now_london.strftime("%A %-d %B %Y")
+
+# GitHub Actions cron only runs in UTC, and the UK shifts between GMT and BST,
+# so the workflow fires twice (6am and 7am UTC) and this decides which run is
+# actually 7am in London. Manual runs (workflow_dispatch) always go through.
+if os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch" and now_london.hour != 7:
+    print(f"Skipping: London time is {now_london.strftime('%H:%M')}, not the 7am run.")
+    sys.exit(0)
+
 weather = get_weather()
-horoscope = ai_horoscope(STAR_SIGN)
 sections_data = {}
 for section, config in SECTIONS.items():
     stories = get_stories(config)
     synthesis, enhanced = ai_enhance(section, stories)
     sections_data[section] = (synthesis, enhanced)
 top_brief = ai_top_brief(sections_data, weather)
-html = build_html(sections_data, top_brief, weather, horoscope, today)
+html = build_html(sections_data, top_brief, weather, today)
 
 payload = {
     "from": "Morning Brief <onboarding@resend.dev>",
     "to": [TO_EMAIL],
-    "subject": f"â Morning Brief â {today}",
+    "subject": f"☀ Morning Brief – {today}",
     "html": html,
 }
 resp = requests.post(

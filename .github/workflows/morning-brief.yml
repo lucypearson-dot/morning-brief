@@ -1,7 +1,11 @@
 name: Morning Brief
 on:
   schedule:
-    - cron: '30 6 * * *'
+    # GitHub Actions cron is UTC-only, and the UK clocks change between GMT and
+    # BST, so we fire at both 6am and 7am UTC; brief.py checks the real London
+    # time and only sends on the run that's actually 7am local.
+    - cron: '0 6 * * *'
+    - cron: '0 7 * * *'
   workflow_dispatch:
 jobs:
   send-brief:
@@ -22,3 +26,4 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}

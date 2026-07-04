@@ -116,6 +116,7 @@ def get_weather():
         resp = requests.get(
             "https://api.open-meteo.com/v1/forecast",
             params={
+                # Solihull (these coordinates were previously mislabelled "Coventry" below)
                 "latitude": 52.4128,
                 "longitude": -1.7780,
                 "current": "temperature_2m,precipitation_probability,weathercode,windspeed_10m",
@@ -296,7 +297,7 @@ def ai_top_brief(sections_data, weather):
     weather_str = ""
     if weather:
         weather_str = (
-            f"Weather in Coventry: {weather['temp']}°C, {weather['desc']}, "
+            f"Weather in Solihull: {weather['temp']}°C, {weather['desc']}, "
             f"wind {weather['wind']}km/h, {weather['precip']}% rain chance."
         )
     summaries = []
@@ -321,47 +322,47 @@ def ai_top_brief(sections_data, weather):
         return None
 
 
+CREAM = "#FDF3DD"
+MINT = "#DFF3EF"
+INK = "#1a1a2e"
+MONO = "'Space Mono',ui-monospace,Menlo,monospace"
+DISPLAY = "'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif"
+
+
 def build_html(sections_data, top_brief, weather, today):
-    # ---- weather block ----
+    # ---- weather line (short, sits under the intro paragraph) ----
     weather_html = ""
     if weather:
         weather_html = f"""
-<tr>
-  <td style="padding:0 20px 20px;">
-    <div style="background:linear-gradient(135deg,#1e3a5f 0%,#2563eb 100%);
-        border-radius:12px;padding:20px 24px;color:#ffffff;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div>
-          <span style="font-size:32px;font-weight:800;">{weather['temp']}°C</span>
-          <span style="font-size:22px;margin-left:8px;">{weather['icon']}</span>
-          <div style="font-size:22px;margin-top:4px;">{weather['desc']}</div>
-          <div style="font-size:18px;margin-top:6px;color:#93c5fd;">
-            &#8593;{weather['hi']}° &#8595;{weather['lo']}° &nbsp;&#183;&nbsp;
-            &#127783; {weather['precip']}% &nbsp;&#183;&nbsp; &#128168; {weather['wind']} km/h
-          </div>
-        </div>
-        <div style="font-size:18px;color:#bfdbfe;text-align:right;">
-          Coventry
-        </div>
-      </div>
-    </div>
-  </td>
-</tr>"""
+          <p style="margin:14px 0 0;font-size:15px;color:#57534e;font-family:{MONO};">
+            <span aria-hidden="true">{weather['icon']}</span> It's
+            <strong style="font-size:20px;color:{INK};">{weather['temp']}&deg;C</strong>
+            and {weather['desc'].lower()} in Solihull &nbsp;&#183;&nbsp;
+            &#8593;{weather['hi']}&deg; &#8595;{weather['lo']}&deg; &nbsp;&#183;&nbsp; {weather['precip']}% rain
+          </p>"""
 
-    # ---- PA brief block ----
-    brief_html = ""
-    if top_brief:
-        brief_html = f"""
-<tr>
-  <td style="padding:0 20px 20px;">
-    <div style="background:#f0f9ff;border-left:5px solid #2563eb;
-        border-radius:0 10px 10px 0;padding:20px 22px;">
-      <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#1e40af;
-          text-transform:uppercase;letter-spacing:0.08em;"><span aria-hidden="true">&#128101;</span> Morning Brief</p>
-      <p style="margin:0;font-size:18px;color:#1e293b;line-height:1.7;">{html_lib.escape(top_brief)}</p>
-    </div>
-  </td>
-</tr>"""
+    # ---- "sections covered" checklist (2 columns, so 7 sections don't push
+    # a full extra screen of scrolling before any actual news appears) ----
+    section_names = list(SECTIONS)
+    checklist_rows = ""
+    for i in range(0, len(section_names), 2):
+        row_names = section_names[i:i + 2]
+        cells = ""
+        for section_name in row_names:
+            included = bool(sections_data.get(section_name, (None, []))[1])
+            accent = SECTIONS[section_name]["color"] if included else "#6b625b"
+            text_style = "none" if included else "line-through"
+            mark = "&#10003;" if included else "&#10007;"
+            cells += f"""
+        <td width="50%" style="padding:5px 8px 5px 0;font-family:{MONO};font-size:15px;vertical-align:top;">
+          <span style="color:{accent};font-weight:700;">{mark}</span>
+          <span style="color:{'#1c1917' if included else '#6b625b'};text-decoration:{text_style};margin-left:10px;">
+            {html_lib.escape(section_name)}
+          </span>
+        </td>"""
+        if len(row_names) == 1:
+            cells += '<td width="50%"></td>'
+        checklist_rows += f"<tr>{cells}</tr>"
 
     # ---- news sections ----
     sections_html = ""
@@ -377,10 +378,10 @@ def build_html(sections_data, top_brief, weather, today):
             safe_synth = html_lib.escape(synthesis)
             synthesis_html = f"""
     <tr>
-      <td style="padding:0 20px 18px;">
-        <div style="background:#f8fafc;border-left:3px solid {color};
+      <td style="padding:0 24px 18px;">
+        <div style="background:#faf9f7;border-left:3px solid {color};
             border-radius:0 8px 8px 0;padding:14px 16px;">
-          <p style="margin:0;font-size:18px;font-weight:600;color:#1e293b;line-height:1.7;">
+          <p style="margin:0;font-size:18px;font-weight:600;color:{INK};line-height:1.7;">
             {safe_synth}
           </p>
         </div>
@@ -394,58 +395,58 @@ def build_html(sections_data, top_brief, weather, today):
             safe_body = html_lib.escape(body)
             safe_url = html_lib.escape(url, quote=True)
 
-            thumb_html = ""
+            # Real RSS photo when the feed has one; otherwise a generated
+            # color-block graphic so every story still gets a visual anchor.
             if thumbnail:
                 safe_thumb = html_lib.escape(thumbnail, quote=True)
-                thumb_html = f"""
-          <td class="thumb" width="110" style="padding:0 0 0 16px;vertical-align:top;">
-            <a href="{safe_url}" tabindex="-1" aria-hidden="true">
-              <img src="{safe_thumb}" width="110" height="74"
-                   alt="{title_attr}"
-                   style="display:block;border-radius:8px;object-fit:cover;width:110px;height:74px;">
-            </a>
-          </td>"""
+                media_html = f"""
+              <img src="{safe_thumb}" alt="" width="572" height="220"
+                   style="display:block;width:100%;max-width:100%;height:220px;
+                          object-fit:cover;border-radius:10px;margin:0 0 14px;">"""
+            else:
+                media_html = f"""
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">
+                <tr>
+                  <td height="120" style="height:120px;background:{color};border-radius:10px;
+                      text-align:center;vertical-align:middle;font-size:38px;" aria-hidden="true">
+                    {icon}
+                  </td>
+                </tr>
+              </table>"""
 
             articles_html += f"""
     <tr>
-      <td style="padding:0 20px 20px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
-            style="border-left:3px solid {color};">
-          <tr>
-            <td style="vertical-align:top;padding:2px 0 2px 14px;">
-              <a href="{safe_url}" style="text-decoration:underline;text-decoration-color:#cbd5e1;color:#1e293b;"
-                 aria-label="Read: {title_attr}">
-                <p style="margin:0 0 8px;font-size:24px;font-weight:700;line-height:1.4;
-                    color:#1e293b;">{safe_title}</p>
-              </a>
-              <p style="margin:0 0 10px;font-size:18px;color:#374151;line-height:1.6;">
-                {safe_body}
-              </p>
-              <a href="{safe_url}"
-                 aria-label="Read: {title_attr}"
-                 style="font-size:16px;color:{color};font-weight:600;text-decoration:none;
-                        display:inline-block;padding:12px 8px 12px 0;">
-                Read <span aria-hidden="true">&#8594;</span>
-              </a>
-            </td>{thumb_html}
-          </tr>
-        </table>
+      <td style="padding:0 24px 22px;">
+        <div style="border-left:3px solid {color};padding:2px 0 2px 14px;">
+          <a href="{safe_url}" style="text-decoration:none;color:{INK};" aria-label="Read: {title_attr}">
+            {media_html}
+            <h3 style="margin:0 0 8px;font-size:23px;font-weight:700;line-height:1.4;
+                text-decoration:underline;text-decoration-color:#cbd5e1;
+                font-family:{DISPLAY};color:{INK};">{safe_title}</h3>
+          </a>
+          <p style="margin:0 0 10px;font-size:17px;color:#44403c;line-height:1.6;">
+            {safe_body}
+          </p>
+          <a href="{safe_url}"
+             aria-label="Read: {title_attr}"
+             style="font-size:15px;color:{color};font-weight:700;text-decoration:none;
+                    display:inline-block;padding:12px 8px 12px 0;font-family:{MONO};">
+            Read more&#8230;
+          </a>
+        </div>
       </td>
     </tr>
-    <tr><td style="padding:0 20px;"><hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 16px;"></td></tr>"""
+    <tr><td style="padding:0 24px;"><hr style="border:none;border-top:1px solid {color};opacity:0.25;margin:0 0 18px;"></td></tr>"""
 
         sections_html += f"""
 <tr>
-  <td style="padding:30px 20px 14px;">
+  <td align="center" style="padding:34px 24px 18px;">
     <table role="presentation" cellpadding="0" cellspacing="0">
       <tr>
-        <td width="34" height="34" style="width:34px;height:34px;background:{color};
-            border-radius:9px;text-align:center;vertical-align:middle;font-size:17px;line-height:34px;">
-          <span aria-hidden="true">{icon}</span>
-        </td>
-        <td style="padding-left:12px;vertical-align:middle;">
-          <h2 style="margin:0;font-size:21px;font-weight:800;color:#0f172a;letter-spacing:-0.2px;">
-            {safe_section}
+        <td style="background:{color};border-radius:999px;padding:10px 22px;text-align:center;">
+          <h2 style="margin:0;display:inline;font-size:15px;font-weight:700;color:#ffffff;
+              letter-spacing:0.04em;text-transform:uppercase;font-family:{MONO};">
+            <span style="font-size:16px;" aria-hidden="true">{icon}</span> {safe_section}
           </h2>
         </td>
       </tr>
@@ -462,14 +463,15 @@ def build_html(sections_data, top_brief, weather, today):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Morning Brief &#8211; {today}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   body {{ margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }}
+  h1, h2, h3 {{ text-wrap: balance; }}
+  p {{ text-wrap: pretty; }}
   @media only screen and (max-width: 620px) {{
     .email-outer {{ padding: 0 !important; }}
-    .email-card {{ border-radius: 0 !important; box-shadow: none !important; }}
-    .hd {{ padding: 22px 18px !important; }}
-    .hd h1 {{ font-size: 26px !important; }}
-    .thumb {{ display: none !important; width: 0 !important; padding: 0 !important; overflow: hidden !important; }}
+    .hd h1 {{ font-size: 34px !important; }}
   }}
 </style>
 </head>
@@ -479,38 +481,60 @@ def build_html(sections_data, top_brief, weather, today):
   <tr>
     <td class="email-outer" align="center" style="padding:24px 16px;">
       <table class="email-card" role="presentation" width="100%" cellpadding="0" cellspacing="0"
-          style="background:#ffffff;max-width:620px;border-radius:14px;overflow:hidden;
-                 box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+          style="background:#ffffff;max-width:620px;overflow:hidden;">
 
         <!-- Header -->
         <tr>
-          <td class="hd" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);
-              padding:28px 24px;">
-            <h1 style="margin:0;font-size:30px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
-              <span aria-hidden="true">&#9788;</span> Morning Brief
-            </h1>
-            <p style="margin:6px 0 0;font-size:16px;color:#94a3b8;">Good morning, Lucy &nbsp;&#183;&nbsp; {today}</p>
+          <td class="hd" align="center" style="background:{CREAM};padding:36px 24px 6px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+              <tr>
+                <td width="52" height="52" style="width:52px;height:52px;border:2px solid {INK};
+                    border-radius:16px;text-align:center;vertical-align:middle;font-size:22px;
+                    line-height:52px;color:{INK};" aria-hidden="true">&#9788;</td>
+              </tr>
+            </table>
+            <p style="margin:16px 0 0;font-size:12px;font-weight:700;letter-spacing:0.2em;
+                color:#57534e;text-transform:uppercase;font-family:{MONO};">{today}</p>
+            <h1 style="margin:6px 0 0;font-size:44px;font-weight:800;color:{INK};
+                font-family:{DISPLAY};letter-spacing:-1px;">Morning Brief</h1>
           </td>
         </tr>
 
-        <!-- Weather -->
-        {weather_html}
+        <!-- Intro -->
+        <tr>
+          <td align="center" style="background:{CREAM};padding:14px 30px 32px;">
+            <p style="margin:0;font-size:17px;line-height:1.8;color:#3f3a34;text-align:center;">
+              {html_lib.escape(top_brief) if top_brief else f"Good morning, Lucy &#8212; here's what's crossed the wires."}
+            </p>
+            {weather_html}
+          </td>
+        </tr>
 
-        <!-- PA brief -->
-        {brief_html}
-
-        <!-- Divider -->
-        <tr><td style="padding:0 20px 20px;">
-          <hr style="border:none;border-top:2px solid #e2e8f0;margin:0;">
-        </td></tr>
+        <!-- Sections covered checklist -->
+        <tr>
+          <td style="background:{CREAM};padding:0 24px 34px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                style="background:{MINT};border-radius:12px;padding:18px 22px;">
+              <tr>
+                <td style="font-family:{MONO};font-size:11px;font-weight:700;letter-spacing:0.14em;
+                    color:#0f766e;text-transform:uppercase;padding-bottom:8px;">
+                  In today's brief
+                </td>
+              </tr>
+              {checklist_rows}
+            </table>
+          </td>
+        </tr>
 
         <!-- News sections -->
         {sections_html}
 
         <!-- Footer -->
         <tr>
-          <td style="padding:24px 20px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-            <p style="margin:0;font-size:16px;color:#475569;text-align:center;">
+          <td align="center" style="padding:30px 20px;background:{CREAM};">
+            <div aria-hidden="true" style="width:36px;height:36px;border:2px solid {INK};border-radius:11px;
+                margin:0 auto 12px;text-align:center;line-height:36px;font-size:15px;color:{INK};">&#9788;</div>
+            <p style="margin:0;font-size:14px;color:#57534e;text-align:center;font-family:{MONO};">
               Delivered by Morning Brief &nbsp;&#183;&nbsp; {today}
             </p>
           </td>

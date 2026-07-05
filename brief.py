@@ -366,12 +366,19 @@ def build_html(sections_data, top_brief, weather, today):
 
     # ---- news sections ----
     sections_html = ""
+    first_section = True
     for section_name, (synthesis, stories) in sections_data.items():
         if not stories:
             continue
         color = SECTIONS[section_name]["color"]
         icon = SECTION_ICONS.get(section_name, "&#128240;")
         safe_section = html_lib.escape(section_name)
+
+        # A firmer break between whole sections, distinct from the lighter
+        # per-article dividers, so the eye knows a new topic has started.
+        section_break = "" if first_section else """
+<tr><td style="padding:0 24px;"><hr style="border:none;border-top:2px solid #e7e5e4;margin:0;"></td></tr>"""
+        first_section = False
 
         synthesis_html = ""
         if synthesis:
@@ -381,7 +388,7 @@ def build_html(sections_data, top_brief, weather, today):
       <td style="padding:0 24px 18px;">
         <div style="background:#faf9f7;border-left:3px solid {color};
             border-radius:0 8px 8px 0;padding:14px 16px;">
-          <p style="margin:0;font-size:18px;font-weight:600;color:{INK};line-height:1.7;">
+          <p style="margin:0;font-size:18px;font-weight:600;color:{INK};line-height:1.5;">
             {safe_synth}
           </p>
         </div>
@@ -424,14 +431,14 @@ def build_html(sections_data, top_brief, weather, today):
                 text-decoration:underline;text-decoration-color:#cbd5e1;
                 font-family:{DISPLAY};color:{INK};">{safe_title}</h3>
           </a>
-          <p style="margin:0 0 10px;font-size:17px;color:#44403c;line-height:1.6;">
+          <p style="margin:0 0 10px;font-size:17px;color:#44403c;line-height:1.5;">
             {safe_body}
           </p>
           <a href="{safe_url}"
              aria-label="Read: {title_attr}"
              style="font-size:15px;color:{color};font-weight:700;text-decoration:none;
                     display:inline-block;padding:12px 8px 12px 0;font-family:{MONO};">
-            Read more&#8230;
+            Read &#8594;
           </a>
         </div>
       </td>
@@ -439,6 +446,7 @@ def build_html(sections_data, top_brief, weather, today):
     <tr><td style="padding:0 24px;"><hr style="border:none;border-top:1px solid {color};opacity:0.25;margin:0 0 18px;"></td></tr>"""
 
         sections_html += f"""
+{section_break}
 <tr>
   <td align="center" style="padding:34px 24px 18px;">
     <table role="presentation" cellpadding="0" cellspacing="0">
@@ -503,7 +511,7 @@ def build_html(sections_data, top_brief, weather, today):
         <!-- Intro -->
         <tr>
           <td align="center" style="background:{CREAM};padding:14px 30px 32px;">
-            <p style="margin:0;font-size:17px;line-height:1.8;color:#3f3a34;text-align:center;">
+            <p style="margin:0;font-size:17px;line-height:1.6;color:#3f3a34;text-align:center;">
               {html_lib.escape(top_brief) if top_brief else f"Good morning, Lucy &#8212; here's what's crossed the wires."}
             </p>
             {weather_html}

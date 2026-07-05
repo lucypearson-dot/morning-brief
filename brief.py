@@ -388,7 +388,7 @@ def build_html(sections_data, top_brief, weather, today):
       <td style="padding:0 24px 18px;">
         <div style="background:#faf9f7;border-left:3px solid {color};
             border-radius:0 8px 8px 0;padding:14px 16px;">
-          <p style="margin:0;font-size:18px;font-weight:600;color:{INK};line-height:1.5;">
+          <p style="margin:0;font-size:18px;font-weight:600;color:{INK};line-height:1.35;">
             {safe_synth}
           </p>
         </div>
@@ -431,7 +431,7 @@ def build_html(sections_data, top_brief, weather, today):
                 text-decoration:underline;text-decoration-color:#cbd5e1;
                 font-family:{DISPLAY};color:{INK};">{safe_title}</h3>
           </a>
-          <p style="margin:0 0 10px;font-size:17px;color:#44403c;line-height:1.5;">
+          <p style="margin:0 0 10px;font-size:17px;color:#44403c;line-height:1.35;">
             {safe_body}
           </p>
           <a href="{safe_url}"
@@ -511,7 +511,7 @@ def build_html(sections_data, top_brief, weather, today):
         <!-- Intro -->
         <tr>
           <td align="center" style="background:{CREAM};padding:14px 30px 32px;">
-            <p style="margin:0;font-size:17px;line-height:1.6;color:#3f3a34;text-align:center;">
+            <p style="margin:0;font-size:17px;line-height:1.4;color:#3f3a34;text-align:center;">
               {html_lib.escape(top_brief) if top_brief else f"Good morning, Lucy &#8212; here's what's crossed the wires."}
             </p>
             {weather_html}

@@ -251,7 +251,6 @@ def ai_enhance(section_name, stories):
             "Do NOT start your response with the section name or repeat it."
         ),
         "headline": "Rewrite this headline to be sharper and more informative. Max 12 words.",
-        "body": "In 2 sentences, explain why this story matters to someone tracking geopolitics and policy.",
     }
     try:
         # Synthesis
@@ -276,16 +275,8 @@ def ai_enhance(section_name, stories):
                     )}],
                     max_tokens=60,
                 )
-                b_resp = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": (
-                        f"TITLE: {title}\nSUMMARY: {summary}\n\n{prompts['body']}"
-                    )}],
-                    max_tokens=120,
-                )
                 enh_title = h_resp.choices[0].message.content.strip()
-                enh_body = b_resp.choices[0].message.content.strip()
-                enhanced.append((enh_title, url, enh_body, thumbnail))
+                enhanced.append((enh_title, url, summary, thumbnail))
             except Exception:
                 enhanced.append((title, url, summary, thumbnail))
         return synthesis, enhanced
@@ -395,55 +386,29 @@ def build_html(sections_data, top_brief, weather, today):
       </td>
     </tr>"""
 
+        # A plain stacked list of links per section, rather than a photo +
+        # headline + summary card per story - quicker to scan, click through
+        # for the detail instead of reading a summary here.
         articles_html = ""
         for title, url, body, thumbnail in stories:
             title_attr = html_lib.escape(title, quote=True)
             safe_title = html_lib.escape(title)
-            safe_body = html_lib.escape(body)
             safe_url = html_lib.escape(url, quote=True)
-
-            # Real RSS photo when the feed has one; otherwise a generated
-            # color-block graphic so every story still gets a visual anchor.
-            if thumbnail:
-                safe_thumb = html_lib.escape(thumbnail, quote=True)
-                media_html = f"""
-              <img src="{safe_thumb}" alt="" width="572" height="220"
-                   style="display:block;width:100%;max-width:100%;height:220px;
-                          object-fit:cover;border-radius:10px;margin:0 0 14px;">"""
-            else:
-                media_html = f"""
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">
-                <tr>
-                  <td height="120" style="height:120px;background:{color};border-radius:10px;
-                      text-align:center;vertical-align:middle;font-size:38px;" aria-hidden="true">
-                    {icon}
-                  </td>
-                </tr>
-              </table>"""
 
             articles_html += f"""
     <tr>
-      <td style="padding:0 24px 22px;">
-        <div style="border-left:3px solid {color};padding:2px 0 2px 14px;">
-          <a href="{safe_url}" style="text-decoration:none;color:{INK};" aria-label="Read: {title_attr}">
-            {media_html}
-            <h3 style="margin:0 0 8px;font-size:23px;font-weight:700;line-height:1.4;
-                text-decoration:underline;text-decoration-color:#cbd5e1;
-                font-family:{DISPLAY};color:{INK};">{safe_title}</h3>
+      <td style="padding:0 24px;border-bottom:1px solid #f1f5f9;">
+        <h3 style="margin:0;font-size:17px;font-weight:600;line-height:1.4;">
+          <a href="{safe_url}" title="{title_attr}"
+             style="display:block;padding:12px 0;color:{INK};text-decoration:none;">
+            <span aria-hidden="true" style="color:{color};font-weight:700;">&#8594;</span>
+            {safe_title}
           </a>
-          <p style="margin:0 0 10px;font-size:17px;color:#44403c;line-height:1.35;">
-            {safe_body}
-          </p>
-          <a href="{safe_url}"
-             aria-label="Read: {title_attr}"
-             style="font-size:15px;color:{color};font-weight:700;text-decoration:none;
-                    display:inline-block;padding:12px 8px 12px 0;font-family:{MONO};">
-            Read &#8594;
-          </a>
-        </div>
+        </h3>
       </td>
-    </tr>
-    <tr><td style="padding:0 24px;"><hr style="border:none;border-top:1px solid {color};opacity:0.25;margin:0 0 18px;"></td></tr>"""
+    </tr>"""
+        articles_html += """
+    <tr><td style="padding:0 24px 20px;"></td></tr>"""
 
         sections_html += f"""
 {section_break}

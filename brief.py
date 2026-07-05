@@ -553,11 +553,13 @@ def build_html(sections_data, top_brief, weather, today):
 now_london = datetime.now(LONDON)
 today = now_london.strftime("%A %-d %B %Y")
 
-# GitHub Actions cron only runs in UTC, and the UK shifts between GMT and BST,
-# so the workflow fires twice (6am and 7am UTC) and this decides which run is
-# actually 7am in London. Manual runs (workflow_dispatch) always go through.
-if os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch" and now_london.hour != 7:
-    print(f"Skipping: London time is {now_london.strftime('%H:%M')}, not the 7am run.")
+# GitHub delays "schedule" runs unpredictably (we've seen 2-4.5 hour delays),
+# so the workflow polls every 15 minutes from 5am-10am UTC instead of trying
+# to land on one exact minute. Only skip if it's still before 7am London -
+# once past that, send on the first run that gets here (the workflow's cache
+# check stops it from sending a second time same day). Manual runs always go through.
+if os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch" and now_london.hour < 7:
+    print(f"Skipping: London time is {now_london.strftime('%H:%M')}, before 7am.")
     sys.exit(0)
 
 weather = get_weather()
@@ -583,3 +585,6 @@ resp = requests.post(
 )
 resp.raise_for_status()
 print(f"Sent to {TO_EMAIL}: {resp.json()}")
+
+with open(".sent-marker", "w") as f:
+    f.write(now_london.isoformat())

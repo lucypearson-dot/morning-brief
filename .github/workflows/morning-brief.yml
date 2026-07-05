@@ -1,11 +1,13 @@
 name: Morning Brief
 on:
   schedule:
-    # GitHub Actions cron is UTC-only, and the UK clocks change between GMT and
-    # BST, so we fire at both 6am and 7am UTC; brief.py checks the real London
-    # time and only sends on the run that's actually 7am local.
-    - cron: '0 6 * * *'
-    - cron: '0 7 * * *'
+    # GitHub delays "schedule" runs unpredictably on personal accounts -
+    # we've seen 2-4.5 hour delays daily, not just a few minutes. So instead
+    # of trying to land exactly on 7am, we poll every 15 minutes across a
+    # wide morning window (covers 7am in both GMT and BST) and let brief.py
+    # + the cache-based "already sent today" check pick the first run that's
+    # actually at or after 7am London time and send exactly once.
+    - cron: '*/15 5,6,7,8,9 * * *'
   workflow_dispatch:
 jobs:
   send-brief:
@@ -15,12 +17,24 @@ jobs:
       models: read
     steps:
       - uses: actions/checkout@v4
+      - name: Compute today's London date
+        id: date
+        run: echo "date=$(TZ='Europe/London' date +%F)" >> "$GITHUB_OUTPUT"
+      - name: Check if already sent today
+        id: sent_cache
+        uses: actions/cache@v4
+        with:
+          path: .sent-marker
+          key: morning-brief-sent-${{ steps.date.outputs.date }}
       - uses: actions/setup-python@v5
+        if: steps.sent_cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch'
         with:
           python-version: '3.12'
       - name: Install dependencies
+        if: steps.sent_cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch'
         run: pip install feedparser requests beautifulsoup4 openai
       - name: Send morning brief
+        if: steps.sent_cache.outputs.cache-hit != 'true' || github.event_name == 'workflow_dispatch'
         run: python brief.py
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
